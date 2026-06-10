@@ -1,10 +1,10 @@
 {
-  "projectId": "nextin-554c8",
-  "appId": "1:191722883755:web:d78559d9957b331d0f05ee",
-  "apiKey": "AIzaSyCyLiKc5Ng7hBKfGIcSermCHfWnXfwHSK4",
-  "authDomain": "nextin-554c8.firebaseapp.com",
+  "projectId": "next-work-1483a",
+  "appId": "1:9138603319:web:16df34f3ce8029854ac6b2",
+  "apiKey": "AIzaSyCYSwB9JDObeFTE3HGvjPH3XVGWRGcNvyY",
+  "authDomain": "next-work-1483a.firebaseapp.com",
   "firestoreDatabaseId": "ai-studio-439e1f63-9bcf-4dc0-a0a0-c3de1097820f",
-  "storageBucket": "nextin-554c8.firebasestorage.app",
-  "messagingSenderId": "191722883755",
+  "storageBucket": "next-work-1483a.firebasestorage.app",
+  "messagingSenderId": "9138603319",
   "measurementId": ""
 }

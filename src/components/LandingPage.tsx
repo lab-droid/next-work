@@ -1000,7 +1000,11 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
                         await signIn();
                       } catch (err: any) {
                         if (err.code !== 'auth/cancelled-popup-request' && err.code !== 'auth/popup-closed-by-user') {
-                          setErrorMsg('Google 로그인에 실패했습니다: ' + (err.message || '') + ' (새 탭에서 열어보시거나 팝업 차단을 해제해주세요)');
+                          if (err.code === 'auth/unauthorized-domain') {
+                            setErrorMsg('Firebase 콘솔(Authentication settings)에서 현재 앱의 URL 도메인을 Authorized domains에 추가해주세요.');
+                          } else {
+                            setErrorMsg('Google 로그인에 실패했습니다: ' + (err.message || '') + ' (새 탭에서 열어보시거나 팝업 차단을 해제해주세요)');
+                          }
                         }
                       } finally {
                         setIsLoading(false);
@@ -1113,7 +1117,11 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
                         await signIn(step === 'login' ? companyCode : undefined);
                       } catch (err: any) {
                         if (err.code !== 'auth/cancelled-popup-request' && err.code !== 'auth/popup-closed-by-user') {
-                          setErrorMsg('Google 로그인에 실패했습니다: ' + (err.message || '') + ' (새 탭에서 열어보시거나 팝업 차단을 해제해주세요)');
+                          if (err.code === 'auth/unauthorized-domain') {
+                            setErrorMsg('Firebase 콘솔(Authentication settings)에서 현재 앱의 URL 도메인을 Authorized domains에 추가해주세요.');
+                          } else {
+                            setErrorMsg('Google 로그인에 실패했습니다: ' + (err.message || '') + ' (새 탭에서 열어보시거나 팝업 차단을 해제해주세요)');
+                          }
                         }
                       } finally {
                         setIsLoading(false);
