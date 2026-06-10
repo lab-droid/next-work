@@ -888,8 +888,13 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
               </p>
 
               {errorMsg && (
-                <div className="mb-6 p-4 bg-red-50 text-red-600 rounded-xl text-sm font-medium border border-red-100">
-                  {errorMsg}
+                <div className="mb-6 p-4 bg-red-50 text-red-600 rounded-xl text-sm font-medium border border-red-100 flex flex-col gap-2">
+                  <span>{errorMsg}</span>
+                  {errorMsg.includes('새 탭') && (
+                    <a href={window.location.href} target="_blank" rel="noopener noreferrer" className="font-bold underline text-red-700 hover:text-red-800">
+                      앱을 새 탭에서 열기
+                    </a>
+                  )}
                 </div>
               )}
 
@@ -942,16 +947,15 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
                     <span className="relative bg-white px-4 text-sm text-gray-500">또는</span>
                   </div>
                   <button 
-                    onClick={async () => {
-                      setErrorMsg('');
-                      setIsLoading(true);
+                    onClick={async (e) => {
+                      e.preventDefault();
                       try {
                         await signIn();
                       } catch (err: any) {
-                        if (err.code === 'auth/cancelled-popup-request') {
-                          // Ignore
-                        } else if (err.code === 'auth/popup-closed-by-user') {
-                          setErrorMsg('결과를 기다리는 중 팝업이 닫혔습니다. 브라우저 팝업 차단을 해제하거나 새 탭에서 앱을 열고 다시 시도해주세요.');
+                        if (err.code === 'auth/cancelled-popup-request' || err.code === 'auth/popup-closed-by-user') {
+                          setErrorMsg('Google 로그인이 취소되었습니다. 팝업이 차단된 경우 우측 상단의 [새 탭에서 열기] 버튼을 이용해주세요.');
+                        } else if (err.code === 'auth/operation-not-allowed') {
+                          setErrorMsg('Firebase 콘솔(Authentication)에서 Google 로그인이 활성화되어 있지 않습니다.');
                         } else if (err.code === 'auth/unauthorized-domain') {
                           setErrorMsg('Firebase 콘솔(Authentication settings)에서 현재 앱의 URL 도메인을 Authorized domains에 추가해주세요.');
                         } else {
@@ -962,8 +966,6 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
                           } catch (e) {}
                           setErrorMsg('Google 로그인에 실패했습니다: ' + msg);
                         }
-                      } finally {
-                        setIsLoading(false);
                       }
                     }}
                     type="button"

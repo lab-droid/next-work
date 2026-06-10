@@ -8,6 +8,9 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId); /* CRITICAL: The app will break without this line */
 export const auth = getAuth();
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+});
 
 export const saveUser = async (user: User, companyCode?: string) => {
   try {
@@ -52,7 +55,7 @@ export const signInWithGoogle = async (companyCode?: string) => {
     return result.user;
   } catch (error: any) {
     if (error.code === 'auth/cancelled-popup-request' || error.code === 'auth/popup-closed-by-user') {
-      console.log('사용자가 로그인을 취소했습니다.');
+      console.log('사용자가 로그인을 취소했습니다.', error);
       throw error;
     }
     

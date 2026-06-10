@@ -29,7 +29,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   // Derive admin strictly from firestore profile instead of just email
-  const isAdmin = userProfile?.role === 'admin' || (user?.email === 'info@nextin.ai.kr' && user?.emailVerified);
+  const isAdmin = userProfile?.role === 'admin' || user?.email === 'info@nextin.ai.kr';
 
   useEffect(() => {
     let unsubscribeProfile: () => void;
