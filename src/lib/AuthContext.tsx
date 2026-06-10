@@ -30,7 +30,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
-        await saveUser(currentUser);
+        try {
+          await saveUser(currentUser);
+        } catch (err) {
+          console.error("Failed to save user in onAuthStateChanged:", err);
+        }
       }
       setLoading(false);
     });

@@ -993,7 +993,17 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
                     <span className="relative bg-white px-4 text-sm text-gray-500">또는</span>
                   </div>
                   <button 
-                    onClick={() => signIn()}
+                    onClick={async () => {
+                      try {
+                        setIsLoading(true);
+                        setErrorMsg('');
+                        await signIn();
+                      } catch (err: any) {
+                        setErrorMsg('Google 로그인에 실패했습니다. (새 탭에서 열어보시거나 팝업 차단을 해제해주세요)');
+                      } finally {
+                        setIsLoading(false);
+                      }
+                    }}
                     type="button"
                     disabled={isLoading}
                     className="w-full py-3.5 bg-white border border-gray-200 text-navy-900 flex items-center justify-center gap-2 rounded-xl font-bold hover:bg-gray-50 transition-colors disabled:opacity-50"
@@ -1094,7 +1104,17 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
                     <span className="relative bg-white px-4 text-sm text-gray-500">또는</span>
                   </div>
                   <button 
-                    onClick={() => signIn(step === 'login' ? companyCode : undefined)}
+                    onClick={async () => {
+                      try {
+                        setIsLoading(true);
+                        setErrorMsg('');
+                        await signIn(step === 'login' ? companyCode : undefined);
+                      } catch (err: any) {
+                        setErrorMsg('Google 로그인에 실패했습니다. (새 탭에서 열어보시거나 팝업 차단을 해제해주세요)');
+                      } finally {
+                        setIsLoading(false);
+                      }
+                    }}
                     type="button"
                     disabled={isLoading}
                     className="w-full py-3.5 bg-white border border-gray-200 text-navy-900 flex items-center justify-center gap-2 rounded-xl font-bold hover:bg-gray-50 transition-colors disabled:opacity-50 mt-2"
