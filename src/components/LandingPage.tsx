@@ -993,16 +993,11 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
                     <span className="relative bg-white px-4 text-sm text-gray-500">또는</span>
                   </div>
                   <button 
-                    onClick={async () => {
-                      try {
-                        setIsLoading(true);
-                        setErrorMsg('');
-                        await signIn();
-                      } catch (err: any) {
-                        setErrorMsg('Google 로그인에 실패했습니다. (새 탭에서 열어보시거나 팝업 차단을 해제해주세요)');
-                      } finally {
-                        setIsLoading(false);
-                      }
+                    onClick={() => {
+                      setErrorMsg('');
+                      signIn().catch((err: any) => {
+                        setErrorMsg('Google 로그인에 실패했습니다: ' + (err.message || '') + ' (새 탭에서 열어보시거나 팝업 차단을 해제해주세요)');
+                      });
                     }}
                     type="button"
                     disabled={isLoading}
@@ -1104,16 +1099,11 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
                     <span className="relative bg-white px-4 text-sm text-gray-500">또는</span>
                   </div>
                   <button 
-                    onClick={async () => {
-                      try {
-                        setIsLoading(true);
-                        setErrorMsg('');
-                        await signIn(step === 'login' ? companyCode : undefined);
-                      } catch (err: any) {
-                        setErrorMsg('Google 로그인에 실패했습니다. (새 탭에서 열어보시거나 팝업 차단을 해제해주세요)');
-                      } finally {
-                        setIsLoading(false);
-                      }
+                    onClick={() => {
+                      setErrorMsg('');
+                      signIn(step === 'login' ? companyCode : undefined).catch((err: any) => {
+                        setErrorMsg('Google 로그인에 실패했습니다: ' + (err.message || '') + ' (새 탭에서 열어보시거나 팝업 차단을 해제해주세요)');
+                      });
                     }}
                     type="button"
                     disabled={isLoading}

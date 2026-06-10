@@ -41,7 +41,6 @@ export const saveUser = async (user: User, companyCode?: string) => {
 
 export const signInWithGoogle = async (companyCode?: string) => {
   try {
-    await setPersistence(auth, browserLocalPersistence);
     const result = await signInWithPopup(auth, googleProvider);
     if (result.user) {
       await saveUser(result.user, companyCode);
