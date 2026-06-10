@@ -61,16 +61,7 @@ export const signInWithGoogle = async (companyCode?: string) => {
       throw error;
     }
     
-    console.log('팝업 로그인이 실패하여 리다이렉트 로그인으로 전환합니다.', error);
-    
-    // Store company code for after redirect
-    if (companyCode) {
-      window.sessionStorage.setItem('pendingCompanyCode', companyCode);
-    }
-    
-    const { signInWithRedirect } = await import('firebase/auth');
-    await signInWithRedirect(auth, googleProvider);
-    return null;
+    throw error;
   }
 };
 
