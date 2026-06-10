@@ -1,0 +1,383 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} { 
+      allow read, write: if false; 
+    }
+
+    function isValidId(id) { 
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isSignedIn() { return request.auth != null; }
+    function isAdmin() {
+      return isSignedIn() && (request.auth.token.email == 'info@nextin.ai.kr' || request.auth.uid == 'Xdv0jBboULZaxCm3KfNo5WqdQoJ3');
+    }
+
+    function isValidTodo(data) {
+      return data.keys().hasAll(['text', 'completed', 'userId', 'createdAt']) &&
+        data.keys().size() == 4 &&
+        data.text is string &&
+        data.text.size() > 0 &&
+        data.text.size() <= 500 &&
+        data.completed is bool &&
+        data.userId == request.auth.uid &&
+        data.createdAt is number;
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'lastLoginAt']) &&
+        data.keys().size() >= 2 && data.keys().size() <= 7 &&
+        data.email is string &&
+        data.lastLoginAt is number &&
+        (data.keys().hasAll(['displayName']) ? (data.displayName is string || data.displayName == null) : true) &&
+        (data.keys().hasAll(['photoURL']) ? (data.photoURL is string || data.photoURL == null) : true) &&
+        (data.keys().hasAll(['clockState']) ? (data.clockState is string || data.clockState == null) : true) &&
+        (data.keys().hasAll(['clockTime']) ? (data.clockTime is string || data.clockTime == null) : true) &&
+        (data.keys().hasAll(['companyCode']) ? (data.companyCode is string || data.companyCode == null) : true);
+    }
+
+    function isValidEvent(data) {
+      return data.keys().hasAll(['userId', 'title', 'date', 'type', 'createdAt']) &&
+        (data.keys().hasAll(['projectId']) ? (data.projectId is string || data.projectId == null) : true) &&
+        data.userId == request.auth.uid &&
+        data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+        data.date is string && data.date.size() <= 50 &&
+        data.type is string && data.type.size() <= 50 &&
+        data.createdAt is number;
+    }
+
+    function isValidCustomer(data) {
+      return data.keys().hasAll(['userId', 'name', 'email', 'phone', 'company', 'status', 'createdAt']) &&
+        (data.keys().size() == 7 || data.keys().size() == 8) &&
+        data.userId == request.auth.uid &&
+        data.name is string && data.name.size() <= 100 &&
+        data.email is string && data.email.size() <= 100 &&
+        data.phone is string && data.phone.size() <= 50 &&
+        data.company is string && data.company.size() <= 100 &&
+        data.status is string && data.status.size() <= 50 &&
+        (data.keys().hasAll(['campaignId']) ? (data.campaignId is string || data.campaignId == null) : true) &&
+        data.createdAt is number;
+    }
+
+
+    function isValidTask(data) {
+      return data.keys().hasAll(['userId', 'content', 'tag', 'tagColor', 'status', 'createdAt']) &&
+        (data.keys().hasAll(['title']) ? data.title is string : true) &&
+        (data.keys().hasAll(['projectId']) ? (data.projectId is string || data.projectId == null) : true) &&
+        (data.keys().hasAll(['assigneeId']) ? (data.assigneeId is string || data.assigneeId == null) : true) &&
+        data.userId == request.auth.uid &&
+        data.content is string && data.content.size() <= 2000 &&
+        data.tag is string &&
+        data.tagColor is string &&
+        data.status is string &&
+        data.createdAt is number;
+    }
+
+    function isValidTransaction(data) {
+      return data.keys().hasAll(['userId', 'type', 'amount', 'date', 'createdAt']) &&
+        data.userId == request.auth.uid &&
+        data.type is string &&
+        data.amount is number &&
+        data.date is string &&
+        data.createdAt is number;
+    }
+
+    function isValidDocument(data) {
+      return data.keys().hasAll(['userId', 'name', 'type', 'size', 'createdAt']) &&
+        (data.keys().hasAll(['projectId']) ? (data.projectId is string || data.projectId == null) : true) &&
+        data.userId == request.auth.uid &&
+        data.name is string && data.name.size() <= 200 &&
+        data.type is string &&
+        data.size is string &&
+        data.createdAt is number;
+    }
+
+    function isValidChat(data) {
+      return data.keys().hasAll(['userId', 'name', 'createdAt']) &&
+        data.userId == request.auth.uid &&
+        data.name is string && data.name.size() <= 100 &&
+        data.createdAt is number;
+    }
+
+    function isValidMessage(data) {
+      return data.keys().hasAll(['userId', 'chatId', 'text', 'sender', 'createdAt']) &&
+        data.userId == request.auth.uid &&
+        data.chatId is string &&
+        data.text is string && data.text.size() <= 1000 &&
+        data.sender is string &&
+        data.createdAt is number;
+    }
+
+    function isValidAnalytics(data) {
+      return data.keys().hasAll(['userId', 'name', 'visitors', 'newUsers', 'createdAt']) &&
+        data.userId == request.auth.uid &&
+        data.name is string && data.name.size() <= 100 &&
+        data.visitors is number &&
+        data.newUsers is number &&
+        data.createdAt is number;
+    }
+
+
+    function isValidNotice(data) {
+      return data.keys().hasAll(['userId', 'title', 'content', 'createdAt']) &&
+        data.userId == request.auth.uid &&
+        data.title is string && data.title.size() <= 200 &&
+        data.content is string && data.content.size() <= 1000 &&
+        data.createdAt is number;
+    }
+
+    function isValidAttendance(data) {
+      return data.keys().hasAll(['userId', 'date', 'checkIn', 'checkOut', 'status', 'createdAt']) &&
+        data.userId == request.auth.uid &&
+        data.date is string && data.date.size() <= 50 &&
+        data.checkIn is string && data.checkIn.size() <= 50 &&
+        data.checkOut is string && data.checkOut.size() <= 50 &&
+        data.status is string && data.status.size() <= 50 &&
+        data.createdAt is number;
+    }
+
+    function isValidApproval(data) {
+      return data.keys().hasAll(['userId', 'title', 'content', 'status', 'createdAt']) &&
+        data.userId == request.auth.uid &&
+        data.title is string && data.title.size() <= 200 &&
+        data.content is string && data.content.size() <= 1000 &&
+        data.status is string && data.status.size() <= 50 &&
+        data.createdAt is number;
+    }
+
+
+
+    function isValidCampaign(data) {
+      return data.keys().hasAll(['userId', 'name', 'status', 'type', 'createdAt']) &&
+        data.userId == request.auth.uid &&
+        data.name is string && data.name.size() <= 200 &&
+        data.status is string && data.status.size() <= 50 &&
+        data.type is string && data.type.size() <= 50 &&
+        data.createdAt is number;
+    }
+
+
+
+    function isValidCompanyInfo(data) {
+      return data.keys().hasAll(['companyName', 'companyCode', 'updatedAt']) &&
+        data.companyName is string && data.companyName.size() <= 100 &&
+        data.companyCode is string && data.companyCode.size() <= 50 &&
+        (data.keys().hasAll(['companyLogo']) ? (data.companyLogo is string || data.companyLogo == null) : true) &&
+        data.updatedAt is number;
+    }
+
+    function isValidProject(data) {
+      return data.keys().hasAll(['name', 'companyCode', 'createdAt']) &&
+        (data.keys().hasAll(['assigneeIds']) ? data.assigneeIds is list : true) &&
+        (data.keys().hasAll(['startDate']) ? data.startDate is string : true) &&
+        (data.keys().hasAll(['endDate']) ? data.endDate is string : true) &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
+        data.companyCode is string &&
+        data.createdAt is number;
+    }
+
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      
+      allow create: if isSignedIn() && (
+        request.auth.uid == userId || 
+        isAdmin() || 
+        (incoming().companyCode == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyCode && incoming().companyCode != null)
+      ) && isValidId(userId) && isValidUser(incoming());
+      
+      allow delete: if isAdmin() || (existing().companyCode == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyCode && existing().companyCode != null);
+      allow update: if isSignedIn() && request.auth.uid == userId &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['email', 'displayName', 'photoURL', 'lastLoginAt', 'clockState', 'clockTime', 'companyCode']) &&
+        isValidUser(incoming());
+    }
+
+    match /todos/{todoId} {
+      allow get: if isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      
+      allow create: if isSignedIn() && isValidId(todoId) && isValidTodo(incoming());
+      
+      allow update: if isSignedIn() && existing().userId == request.auth.uid &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['text', 'completed']) &&
+        incoming().text is string && incoming().text.size() <= 500 &&
+        incoming().completed is bool;
+
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    match /events/{eventId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      
+      allow create: if isSignedIn() && isValidId(eventId) && isValidEvent(incoming());
+      
+      allow update: if isSignedIn() &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['title', 'date', 'type']) &&
+        incoming().title is string && incoming().title.size() > 0 && incoming().title.size() <= 200 &&
+        incoming().date is string && incoming().date.size() <= 50 &&
+        incoming().type is string && incoming().type.size() <= 50;
+        
+      allow delete: if isSignedIn();
+    }
+
+    match /customers/{customerId} {
+      allow get: if isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      
+      allow create: if isSignedIn() && isValidId(customerId) && isValidCustomer(incoming());
+      
+      allow update: if isSignedIn() && existing().userId == request.auth.uid &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'email', 'phone', 'company', 'status', 'campaignId']) &&
+        incoming().name is string && incoming().name.size() <= 100 &&
+        incoming().email is string && incoming().email.size() <= 100 &&
+        incoming().phone is string && incoming().phone.size() <= 50 &&
+        incoming().company is string && incoming().company.size() <= 100 &&
+        incoming().status is string && incoming().status.size() <= 50;
+        
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    match /tasks/{taskId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(taskId) && isValidTask(incoming());
+      allow update: if isSignedIn() &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'assigneeId', 'title', 'content']) &&
+        incoming().status is string;
+      allow delete: if isSignedIn();
+    }
+
+    match /transactions/{txnId} {
+      allow get: if isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(txnId) && isValidTransaction(incoming());
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    match /documents/{docId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(docId) && isValidDocument(incoming());
+      allow update: if isSignedIn() &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['name']) &&
+        incoming().name is string && incoming().name.size() <= 200;
+      allow delete: if isSignedIn();
+    }
+
+    match /chats/{chatId} {
+      allow get: if isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(chatId) && isValidChat(incoming());
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    match /messages/{messageId} {
+      allow get: if isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(messageId) && isValidMessage(incoming());
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    match /analyticsRecords/{recordId} {
+      allow get: if isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(recordId) && isValidAnalytics(incoming());
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    match /notices/{noticeId} {
+      allow get: if isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(noticeId) && isValidNotice(incoming());
+      allow update: if isSignedIn() && existing().userId == request.auth.uid &&
+        incoming().userId == existing().userId &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['title', 'content']) &&
+        incoming().title is string && incoming().title.size() <= 200 &&
+        incoming().content is string && incoming().content.size() <= 1000;
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    match /attendances/{attendanceId} {
+      allow get: if isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(attendanceId) && isValidAttendance(incoming());
+      allow update: if isSignedIn() && existing().userId == request.auth.uid &&
+        incoming().userId == existing().userId &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['checkOut', 'status']) &&
+        incoming().checkOut is string && incoming().checkOut.size() <= 50 &&
+        incoming().status is string && incoming().status.size() <= 50;
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    match /approvals/{approvalId} {
+      allow get: if isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(approvalId) && isValidApproval(incoming());
+      allow update: if isSignedIn() && existing().userId == request.auth.uid &&
+        incoming().userId == existing().userId &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['status']) &&
+        incoming().status is string && incoming().status.size() <= 50;
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    match /campaigns/{campaignId} {
+      allow get: if isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(campaignId) && isValidCampaign(incoming());
+      allow update: if isSignedIn() && existing().userId == request.auth.uid &&
+        incoming().userId == existing().userId &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'type', 'name']) &&
+        incoming().status is string && incoming().status.size() <= 50 &&
+        incoming().type is string && incoming().type.size() <= 50 &&
+        incoming().name is string && incoming().name.size() <= 200;
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    function isValidBlogResult(data) {
+      return data.keys().hasAll(['userId', 'customerId', 'title', 'url', 'publishDate', 'views', 'createdAt']) &&
+        data.userId == request.auth.uid &&
+        data.customerId is string &&
+        (!data.keys().hasAll(['assigneeId']) || (data.assigneeId is string || data.assigneeId == null)) &&
+        data.title is string && data.title.size() <= 200 &&
+        data.url is string && data.url.size() <= 1000 &&
+        data.publishDate is string && data.publishDate.size() <= 50 &&
+        data.views is number &&
+        data.createdAt is number;
+    }
+
+    match /blogResults/{resultId} {
+      allow get: if isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(resultId) && isValidBlogResult(incoming());
+      allow update: if isSignedIn() && existing().userId == request.auth.uid &&
+        incoming().userId == existing().userId &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['title', 'url', 'publishDate', 'views', 'assigneeId']) &&
+        incoming().title is string && incoming().title.size() <= 200 &&
+        incoming().url is string && incoming().url.size() <= 1000 &&
+        incoming().publishDate is string && incoming().publishDate.size() <= 50 &&
+        incoming().views is number &&
+        (!incoming().keys().hasAll(['assigneeId']) || (incoming().assigneeId is string || incoming().assigneeId == null));
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    match /projects/{projectId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(projectId) && isValidProject(incoming());
+      allow update: if isSignedIn() && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'assigneeIds', 'startDate', 'endDate']);
+      allow delete: if isSignedIn();
+    }
+
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin() && docId == 'company_info' && isValidCompanyInfo(incoming());
+    }
+  }
+}
