@@ -34,11 +34,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     let unsubscribeProfile: () => void;
 
+    import('firebase/auth').then(({ getRedirectResult }) => {
+      getRedirectResult(auth).catch((err) => {
+        console.error("Redirect login error:", err);
+      });
+    });
+
     const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
         try {
-          await saveUser(currentUser);
+          const storedCompanyCode = window.sessionStorage.getItem('pendingCompanyCode');
+          if (storedCompanyCode) {
+            await saveUser(currentUser, storedCompanyCode);
+            window.sessionStorage.removeItem('pendingCompanyCode');
+          } else {
+            await saveUser(currentUser);
+          }
           unsubscribeProfile = onSnapshot(doc(db, 'users', currentUser.uid), (docInfo) => {
             if (docInfo.exists()) {
               setUserProfile(docInfo.data());
