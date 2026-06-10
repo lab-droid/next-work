@@ -179,14 +179,6 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
           </nav>
           <div className="flex items-center gap-4">
             <button 
-              onClick={() => { setIsModalOpen(true); setStep('code'); setErrorMsg(''); }} 
-              className="text-sm font-medium text-navy-700 hover:text-brand-500 flex items-center gap-1.5 transition-colors"
-            >
-              <Building className="w-4 h-4" />
-              회사 코드로 로그인
-            </button>
-            <div className="w-px h-4 bg-gray-200 hidden md:block"></div>
-            <button 
               onClick={() => { setIsModalOpen(true); setStep('general-auth'); setIsSignup(false); setErrorMsg(''); setEmail(''); setPassword(''); }} 
               className="text-sm font-medium text-navy-700 hover:text-navy-900 flex items-center gap-1.5 transition-colors"
             >
@@ -1033,33 +1025,6 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
                     </button>
                   </p>
                 </div>
-              ) : step === 'code' ? (
-                <form onSubmit={handleVerifyCode} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">회사 코드</label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <KeyRound className="w-5 h-5 text-gray-400" />
-                      </div>
-                      <input 
-                        type="text"
-                        autoFocus
-                        required
-                        value={companyCode}
-                        onChange={e => setCompanyCode(e.target.value)}
-                        className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all font-medium"
-                        placeholder="회사 코드를 입력하세요"
-                      />
-                    </div>
-                  </div>
-                  <button 
-                    type="submit"
-                    disabled={isLoading}
-                    className="w-full py-3.5 bg-brand-500 text-white rounded-xl font-bold hover:bg-brand-600 transition-colors disabled:opacity-50 mt-4"
-                  >
-                    {isLoading ? '확인 중...' : '다음'}
-                  </button>
-                </form>
               ) : (
                 <>
                   <form onSubmit={handleCompanyLogin} className="space-y-4">
@@ -1114,7 +1079,7 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
                       setErrorMsg('');
                       setIsLoading(true);
                       try {
-                        await signIn(step === 'login' ? companyCode : undefined);
+                        await signIn();
                       } catch (err: any) {
                         if (err.code !== 'auth/cancelled-popup-request' && err.code !== 'auth/popup-closed-by-user') {
                           if (err.code === 'auth/unauthorized-domain') {

@@ -32,7 +32,11 @@ export const saveUser = async (user: User, companyCode?: string) => {
 
       await setDoc(userDocRef, data, { merge: true });
     } else {
-      await setDoc(userDocRef, { lastLoginAt: Date.now() }, { merge: true });
+      const updateData: any = { lastLoginAt: Date.now() };
+      if (companyCode) {
+        updateData.companyCode = companyCode;
+      }
+      await setDoc(userDocRef, updateData, { merge: true });
     }
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, 'users');
@@ -49,6 +53,11 @@ export const signInWithGoogle = async (companyCode?: string) => {
   } catch (error: any) {
     if (error.code === 'auth/cancelled-popup-request' || error.code === 'auth/popup-closed-by-user') {
       console.log('사용자가 로그인을 취소했습니다.');
+      throw error;
+    }
+    
+    if (error.code === 'auth/unauthorized-domain') {
+      console.error('인가되지 않은 도메인입니다.', error);
       throw error;
     }
     

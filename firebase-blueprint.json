@@ -52,6 +52,24 @@
         "clockTime": {
           "type": "string",
           "description": "time of clock state"
+        },
+        "companyCode": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "department": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        },
+        "employeeId": {
+          "type": "string"
+        },
+        "isProfileComplete": {
+          "type": "boolean"
         }
       },
       "required": ["email", "lastLoginAt"]

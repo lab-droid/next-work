@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../lib/AuthContext';
-import { db } from '../lib/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { Building, User, Phone, CheckCircle2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -12,6 +12,7 @@ export default function ProfileSetupView() {
     department: userProfile?.department || '',
     phone: userProfile?.phone || '',
     employeeId: userProfile?.employeeId || '',
+    companyCode: userProfile?.companyCode || '',
   });
   const [loading, setLoading] = useState(false);
 
@@ -20,14 +21,21 @@ export default function ProfileSetupView() {
     if (!user) return;
     setLoading(true);
     try {
+      const docSnap = await getDoc(doc(db, 'settings', 'company_info'));
+      if (docSnap.exists() && docSnap.data().companyCode !== formData.companyCode.trim()) {
+        alert('유효하지 않은 회사 코드입니다. 담당자에게 확인해주세요.');
+        setLoading(false);
+        return;
+      }
+
       await setDoc(doc(db, 'users', user.uid), {
         ...formData,
+        companyCode: formData.companyCode.trim(),
         displayName: formData.name, // compatibility
         isProfileComplete: true,
       }, { merge: true });
     } catch (error) {
-      console.error('Error updating profile:', error);
-      alert('프로필 업데이트에 실패했습니다.');
+      handleFirestoreError(error, OperationType.UPDATE, 'users');
     } finally {
       setLoading(false);
     }
@@ -91,6 +99,20 @@ export default function ProfileSetupView() {
             </div>
           </div>
           <div>
+            <label className="block text-xs font-bold text-navy-700 mb-1.5 ml-1">회사 코드 <span className="text-red-500">*</span></label>
+            <div className="relative">
+              <Building className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                required
+                value={formData.companyCode}
+                onChange={(e) => setFormData(p => ({ ...p, companyCode: e.target.value }))}
+                className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none transition-all"
+                placeholder="부여받은 회사 코드를 입력하세요"
+              />
+            </div>
+          </div>
+          <div>
             <label className="block text-xs font-bold text-navy-700 mb-1.5 ml-1">연락처 <span className="text-red-500">*</span></label>
             <div className="relative">
               <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -114,7 +136,7 @@ export default function ProfileSetupView() {
 
           <button
             type="submit"
-            disabled={loading || !formData.name || !formData.department || !formData.phone}
+            disabled={loading || !formData.name || !formData.department || !formData.phone || !formData.companyCode}
             className="w-full mt-6 bg-brand-500 hover:bg-brand-600 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-sm flex justify-center items-center gap-2 disabled:opacity-50"
           >
             {loading ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span> : '시작하기'}

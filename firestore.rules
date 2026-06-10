@@ -28,14 +28,21 @@ service cloud.firestore {
 
     function isValidUser(data) {
       return data.keys().hasAll(['email', 'lastLoginAt']) &&
-        data.keys().size() >= 2 && data.keys().size() <= 7 &&
+        data.keys().size() >= 2 && data.keys().size() <= 14 &&
         data.email is string &&
         data.lastLoginAt is number &&
         (data.keys().hasAll(['displayName']) ? (data.displayName is string || data.displayName == null) : true) &&
         (data.keys().hasAll(['photoURL']) ? (data.photoURL is string || data.photoURL == null) : true) &&
         (data.keys().hasAll(['clockState']) ? (data.clockState is string || data.clockState == null) : true) &&
         (data.keys().hasAll(['clockTime']) ? (data.clockTime is string || data.clockTime == null) : true) &&
-        (data.keys().hasAll(['companyCode']) ? (data.companyCode is string || data.companyCode == null) : true);
+        (data.keys().hasAll(['companyCode']) ? (data.companyCode is string || data.companyCode == null) : true) &&
+        (data.keys().hasAll(['name']) ? (data.name is string || data.name == null) : true) &&
+        (data.keys().hasAll(['department']) ? (data.department is string || data.department == null) : true) &&
+        (data.keys().hasAll(['phone']) ? (data.phone is string || data.phone == null) : true) &&
+        (data.keys().hasAll(['employeeId']) ? (data.employeeId is string || data.employeeId == null) : true) &&
+        (data.keys().hasAll(['isProfileComplete']) ? data.isProfileComplete is bool : true) &&
+        (data.keys().hasAll(['role']) ? (data.role is string || data.role == null) : true) &&
+        (data.keys().hasAll(['createdAt']) ? (data.createdAt is number || data.createdAt == null) : true);
     }
 
     function isValidEvent(data) {
@@ -190,7 +197,7 @@ service cloud.firestore {
       
       allow delete: if isAdmin() || (existing().companyCode == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyCode && existing().companyCode != null);
       allow update: if isSignedIn() && request.auth.uid == userId &&
-        incoming().diff(existing()).affectedKeys().hasOnly(['email', 'displayName', 'photoURL', 'lastLoginAt', 'clockState', 'clockTime', 'companyCode']) &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['email', 'displayName', 'photoURL', 'lastLoginAt', 'clockState', 'clockTime', 'companyCode', 'name', 'department', 'phone', 'employeeId', 'isProfileComplete']) &&
         isValidUser(incoming());
     }
 
