@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User, setPersistence, browserLocalPersistence, signInWithEmailAndPassword } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer, setDoc } from 'firebase/firestore';
+import { getFirestore, doc, getDocFromServer, setDoc, getDocs, query, collection, limit, getDoc } from 'firebase/firestore';
 import firebaseConfigJson from '../../firebase-applet-config.json';
 
 export const firebaseConfig = firebaseConfigJson;
@@ -11,15 +11,29 @@ export const googleProvider = new GoogleAuthProvider();
 
 export const saveUser = async (user: User, companyCode?: string) => {
   try {
-    const data: any = {
-      email: user.email,
-      lastLoginAt: Date.now()
-    };
-    if (user.displayName) data.displayName = user.displayName;
-    if (user.photoURL) data.photoURL = user.photoURL;
-    if (companyCode) data.companyCode = companyCode;
+    const userDocRef = doc(db, 'users', user.uid);
+    const userSnap = await getDoc(userDocRef);
 
-    await setDoc(doc(db, 'users', user.uid), data, { merge: true });
+    if (!userSnap.exists()) {
+      // Check if this is the very first user
+      const usersSnap = await getDocs(query(collection(db, 'users'), limit(1)));
+      const isFirstUser = usersSnap.empty;
+
+      const data: any = {
+        email: user.email,
+        createdAt: Date.now(),
+        lastLoginAt: Date.now(),
+        role: isFirstUser ? 'admin' : 'user',
+        isProfileComplete: false,
+      };
+      if (user.displayName) data.name = user.displayName; // Save as 'name' for profile form
+      if (user.photoURL) data.photoURL = user.photoURL;
+      if (companyCode) data.companyCode = companyCode;
+
+      await setDoc(userDocRef, data, { merge: true });
+    } else {
+      await setDoc(userDocRef, { lastLoginAt: Date.now() }, { merge: true });
+    }
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, 'users');
   }

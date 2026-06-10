@@ -1,9 +1,11 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged } from 'firebase/auth';
-import { auth, signInWithGoogle, logout, saveUser } from './firebase';
+import { auth, signInWithGoogle, logout, saveUser, db } from './firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 interface AuthContextType {
   user: User | null;
+  userProfile: any | null;
   isAdmin: boolean;
   loading: boolean;
   signIn: (companyCode?: string) => Promise<void>;
@@ -12,6 +14,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
+  userProfile: null,
   isAdmin: false,
   loading: true,
   signIn: async () => {},
@@ -22,24 +25,40 @@ export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [userProfile, setUserProfile] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const isAdmin = user?.email === 'info@nextin.ai.kr' && user?.emailVerified;
+  // Derive admin strictly from firestore profile instead of just email
+  const isAdmin = userProfile?.role === 'admin' || (user?.email === 'info@nextin.ai.kr' && user?.emailVerified);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    let unsubscribeProfile: () => void;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
         try {
           await saveUser(currentUser);
+          unsubscribeProfile = onSnapshot(doc(db, 'users', currentUser.uid), (docInfo) => {
+            if (docInfo.exists()) {
+              setUserProfile(docInfo.data());
+            }
+            setLoading(false); // only finish loading after profile is fetched
+          });
         } catch (err) {
-          console.error("Failed to save user in onAuthStateChanged:", err);
+          console.error("Failed to map user profile:", err);
+          setLoading(false);
         }
+      } else {
+        setUserProfile(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
-    return unsubscribe;
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeProfile) unsubscribeProfile();
+    };
   }, []);
 
   const signIn = async (companyCode?: string) => {
@@ -51,7 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAdmin: !!isAdmin, loading, signIn, signOut: signOutUser }}>
+    <AuthContext.Provider value={{ user, userProfile, isAdmin: !!isAdmin, loading, signIn, signOut: signOutUser }}>
       {children}
     </AuthContext.Provider>
   );

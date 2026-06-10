@@ -121,10 +121,9 @@ export default function DashboardLayout({ currentView, onNavigate }: DashboardLa
     '본사 콘솔': false,
     '프로젝트': true
   });
-  const { user, isAdmin, signOut } = useAuth();
+  const { user, userProfile, isAdmin, signOut } = useAuth();
   const [companyName, setCompanyName] = useState('넥스트워크');
   const [companyLogo, setCompanyLogo] = useState<string | null>(nextworkLogo);
-  const [userProfile, setUserProfile] = useState<any>(null);
   
   const [selectedProject, setSelectedProject] = useState<any>(null);
 
@@ -163,16 +162,9 @@ export default function DashboardLayout({ currentView, onNavigate }: DashboardLa
         setCompanyLogo(docInfo.data().companyLogo || nextworkLogo);
       }
     });
-    
-    const unsubscribeUser = onSnapshot(doc(db, 'users', user.uid), (docInfo) => {
-      if (docInfo.exists()) {
-        setUserProfile(docInfo.data());
-      }
-    });
 
     return () => {
       unsubscribe();
-      unsubscribeUser();
     };
   }, [user]);
 
