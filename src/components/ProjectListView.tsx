@@ -125,8 +125,8 @@ export default function ProjectListView({ onSelectProject, companyCode }: { onSe
             {p.assigneeIds && p.assigneeIds.length > 0 && (
               <div className="flex -space-x-1 mb-2">
                 {p.assigneeIds.slice(0, 3).map(uid => (
-                  <div key={uid} className="w-5 h-5 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-[9px] border border-white font-bold" title={users.find(u => u.id === uid)?.displayName || '담당자'}>
-                    {(users.find(u => u.id === uid)?.displayName || 'U').charAt(0)}
+                  <div key={uid} className="w-5 h-5 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-[9px] border border-white font-bold" title={users.find(u => u.id === uid)?.name || users.find(u => u.id === uid)?.displayName || '담당자'}>
+                    {(users.find(u => u.id === uid)?.name || users.find(u => u.id === uid)?.displayName || 'U').charAt(0)}
                   </div>
                 ))}
                 {p.assigneeIds.length > 3 && (
@@ -188,7 +188,7 @@ export default function ProjectListView({ onSelectProject, companyCode }: { onSe
                     {users.map(u => (
                       <label key={u.id} className="flex items-center gap-2 p-2 border rounded-lg cursor-pointer hover:bg-gray-50">
                         <input type="checkbox" checked={assigneeIds.includes(u.id)} onChange={() => toggleAssignee(u.id)} className="rounded border-gray-300 text-brand-500 focus:ring-brand-500" />
-                        <span className="text-sm">{u.displayName || u.email || '이름 없음'}</span>
+                        <span className="text-sm">{u.name || u.displayName || u.email || '이름 없음'}</span>
                       </label>
                     ))}
                   </div>

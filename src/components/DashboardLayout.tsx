@@ -46,7 +46,10 @@ import MarketingView from './MarketingView';
 import SettingsView from './SettingsView';
 import HQPlaceholderView from './HQPlaceholderView';
 import HQSubscriptionsView from './HQSubscriptionsView';
+import HQCodesView from './HQCodesView';
 import MyTasksView from './MyTasksView';
+import HQCompanySwitcher from './HQCompanySwitcher';
+import CompanySettingsModal from './CompanySettingsModal';
 import { useAuth } from '../lib/AuthContext';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -63,15 +66,16 @@ type NavItem = {
   subItems?: { view: string; label: string }[];
 };
 
-const getNavItems = (isAdmin: boolean) => {
+const getNavItems = (isHQAdmin: boolean) => {
   const items: NavItem[] = [];
   
-  if (isAdmin) {
+  if (isHQAdmin) {
     items.push({
       icon: Shield,
       label: '본사 콘솔',
       subItems: [
         { view: 'hq-dashboard', label: '대시보드' },
+        { view: 'hq-codes', label: '코드 관리' },
         { view: 'hq-plans', label: '요금제 관리' },
         { view: 'hq-subscriptions', label: '구독 관리' },
         { view: 'hq-payments', label: '결제 내역' },
@@ -121,13 +125,14 @@ export default function DashboardLayout({ currentView, onNavigate }: DashboardLa
     '본사 콘솔': false,
     '프로젝트': true
   });
-  const { user, userProfile, isAdmin, signOut } = useAuth();
+  const { user, userProfile, isAdmin, isHQAdmin, signOut } = useAuth();
   const [companyName, setCompanyName] = useState('넥스트워크');
   const [companyLogo, setCompanyLogo] = useState<string | null>(nextworkLogo);
   
+  const [isCompanySettingsOpen, setIsCompanySettingsOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<any>(null);
 
-  let navItems = getNavItems(isAdmin);
+  let navItems = getNavItems(isHQAdmin);
   if (!isAdmin && userProfile?.allowedMenus) {
     const allowed = userProfile.allowedMenus;
     navItems = navItems.map(item => {
@@ -155,18 +160,32 @@ export default function DashboardLayout({ currentView, onNavigate }: DashboardLa
   }, []);
 
   useEffect(() => {
-    if (!user) return;
-    const unsubscribe = onSnapshot(doc(db, 'settings', 'company_info'), (docInfo) => {
+    if (!user || (!userProfile?.companyCode && !isHQAdmin)) return;
+    
+    // If no company code is bound yet (e.g. newly created HQ admin before applying a code)
+    if (!userProfile?.companyCode) {
+      setCompanyName('넥스트워크 본사 관리 (코드 미적용)');
+      return;
+    }
+
+    const unsubscribe = onSnapshot(doc(db, 'company_codes', userProfile.companyCode), (docInfo) => {
       if (docInfo.exists()) {
         setCompanyName(docInfo.data().companyName || '넥스트워크');
         setCompanyLogo(docInfo.data().companyLogo || nextworkLogo);
+      } else {
+        setCompanyName('넥스트워크');
+        setCompanyLogo(nextworkLogo);
+      }
+    }, (error: any) => {
+      if (error.code !== 'permission-denied') {
+        console.warn("Company info subscription warning:", error);
       }
     });
 
     return () => {
       unsubscribe();
     };
-  }, [user]);
+  }, [user, userProfile?.companyCode, isHQAdmin]);
 
   return (
     <div className="min-h-screen bg-surface-light flex font-sans">
@@ -175,7 +194,14 @@ export default function DashboardLayout({ currentView, onNavigate }: DashboardLa
         <div className="h-16 flex justify-between items-center px-6 border-b border-navy-800">
           <div 
             className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
-            onClick={() => onNavigate('landing')}
+            onClick={() => {
+              if (isAdmin) {
+                setIsCompanySettingsOpen(true);
+              } else {
+                onNavigate('landing');
+              }
+            }}
+            title={isAdmin ? "회사 정보 설정" : "랜딩 페이지로 이동"}
           >
             {companyLogo ? (
               <div className="w-7 h-7 rounded-md overflow-hidden shrink-0">
@@ -263,9 +289,9 @@ export default function DashboardLayout({ currentView, onNavigate }: DashboardLa
             설정
           </button>
           <div className="mt-4 flex items-center gap-3 px-3 py-2">
-            <img src={user?.photoURL || "https://i.pravatar.cc/150"} alt="User" className="w-8 h-8 rounded-full border border-navy-700" />
+            <img src={userProfile?.photoURL || user?.photoURL || "https://i.pravatar.cc/150"} alt="User" className="w-8 h-8 object-cover rounded-full border border-navy-700" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">{user?.displayName || '사용자'}</p>
+              <p className="text-sm font-medium text-white truncate">{userProfile?.name || user?.displayName || '사용자'}</p>
               <p className="text-xs text-brand-400 truncate">{user?.email || ''}</p>
             </div>
             <button onClick={signOut} title="로그아웃" className="p-2 text-gray-400 hover:text-red-400 transition-all bg-navy-800 rounded-lg">
@@ -292,6 +318,7 @@ export default function DashboardLayout({ currentView, onNavigate }: DashboardLa
           </div>
 
           <div className="flex items-center gap-3 sm:gap-4">
+            <HQCompanySwitcher />
             <button 
               onClick={() => setIsSearchOpen(true)}
               className="flex items-center gap-2 bg-gray-50 hover:bg-gray-100 text-gray-400 border border-gray-200 px-3 sm:px-4 py-2 rounded-lg text-sm transition-colors w-10 sm:w-64"
@@ -340,8 +367,9 @@ export default function DashboardLayout({ currentView, onNavigate }: DashboardLa
             {currentView === 'notice' && <NoticeView />}
             {currentView === 'settings' && <SettingsView />}
             {currentView === 'admin' && <AdminView />}
-            {currentView === 'hq-subscriptions' && isAdmin && <HQSubscriptionsView />}
-            {currentView.startsWith('hq-') && currentView !== 'hq-subscriptions' && isAdmin && <HQPlaceholderView viewName={navItems.flatMap(i => i.subItems ? i.subItems : [{ view: i.view || '', label: i.label }]).find(sub => sub.view === currentView)?.label || ''} />}
+            {currentView === 'hq-subscriptions' && isHQAdmin && <HQSubscriptionsView />}
+            {currentView === 'hq-codes' && isHQAdmin && <HQCodesView />}
+            {currentView.startsWith('hq-') && currentView !== 'hq-subscriptions' && currentView !== 'hq-codes' && isHQAdmin && <HQPlaceholderView viewName={navItems.flatMap(i => i.subItems ? i.subItems : [{ view: i.view || '', label: i.label }]).find(sub => sub.view === currentView)?.label || ''} />}
           </div>
         </main>
       </div>
@@ -357,7 +385,18 @@ export default function DashboardLayout({ currentView, onNavigate }: DashboardLa
             >
               <X className="w-5 h-5" />
             </button>
-            <div className="px-6 pb-6 border-b border-navy-800 flex items-center gap-2">
+            <div 
+              className="px-6 pb-6 border-b border-navy-800 flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => {
+                if (isAdmin) {
+                  setIsCompanySettingsOpen(true);
+                  setIsMobileMenuOpen(false);
+                } else {
+                  onNavigate('landing');
+                  setIsMobileMenuOpen(false);
+                }
+              }}
+            >
                {companyLogo ? (
                  <div className="w-7 h-7 rounded-md overflow-hidden shrink-0">
                    <img src={companyLogo} alt={companyName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -464,6 +503,14 @@ export default function DashboardLayout({ currentView, onNavigate }: DashboardLa
 
       {/* Search Modal */}
       <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+      
+      {/* Company Settings Modal */}
+      <CompanySettingsModal 
+        isOpen={isCompanySettingsOpen} 
+        onClose={() => setIsCompanySettingsOpen(false)} 
+        currentName={companyName}
+        currentLogo={companyLogo}
+      />
     </div>
   );
 }

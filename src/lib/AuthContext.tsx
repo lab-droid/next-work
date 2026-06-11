@@ -7,6 +7,7 @@ interface AuthContextType {
   user: User | null;
   userProfile: any | null;
   isAdmin: boolean;
+  isHQAdmin: boolean;
   loading: boolean;
   signIn: (companyCode?: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -16,6 +17,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   userProfile: null,
   isAdmin: false,
+  isHQAdmin: false,
   loading: true,
   signIn: async () => {},
   signOut: async () => {},
@@ -29,7 +31,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   // Derive admin strictly from firestore profile instead of just email
-  const isAdmin = userProfile?.role === 'admin' || user?.email === 'info@nextin.ai.kr';
+  const isHQAdmin = user?.email === 'info@nextin.ai.kr';
+  const isAdmin = userProfile?.role === 'admin' || isHQAdmin;
 
   useEffect(() => {
     let unsubscribeProfile: () => void;
@@ -41,6 +44,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        setLoading(true);
+      }
       setUser(currentUser);
       if (currentUser) {
         try {
@@ -54,8 +60,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           unsubscribeProfile = onSnapshot(doc(db, 'users', currentUser.uid), (docInfo) => {
             if (docInfo.exists()) {
               setUserProfile(docInfo.data());
+            } else {
+              setUserProfile(null);
             }
-            setLoading(false); // only finish loading after profile is fetched
+            setLoading(false); // only finish loading after profile is fetched or determined not to exist
+          }, (error: any) => {
+            if (error.code === 'permission-denied') {
+              // Ignore expected permission-denied errors that occur during the sign-out process
+              // when the auth state becomes invalid before the snapshot listener can be fully cleaned up.
+            } else {
+              console.error("Profile onSnapshot error:", error);
+            }
+            setUserProfile(null);
+            setLoading(false);
           });
         } catch (err) {
           console.error("Failed to map user profile:", err);
@@ -82,7 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, userProfile, isAdmin: !!isAdmin, loading, signIn, signOut: signOutUser }}>
+    <AuthContext.Provider value={{ user, userProfile, isAdmin: !!isAdmin, isHQAdmin: !!isHQAdmin, loading, signIn, signOut: signOutUser }}>
       {children}
     </AuthContext.Provider>
   );

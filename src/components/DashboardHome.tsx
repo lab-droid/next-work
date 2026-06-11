@@ -16,7 +16,7 @@ interface Todo {
 
 export default function DashboardHome() {
   const { confirm, alert } = useModal();
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   
   const [todos, setTodos] = useState<Todo[]>([]);
   
@@ -129,7 +129,7 @@ export default function DashboardHome() {
           
           <div>
             <p className="text-gray-500 mb-2 font-medium">{format(new Date(), 'yyyy년 MM월 dd일 (EEE)')}</p>
-            <h2 className="text-2xl sm:text-3xl font-bold text-navy-900 mb-2">안녕하세요, {user?.displayName ? user.displayName.split(' ')[0] : '사용자'}님! 👋</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold text-navy-900 mb-2">안녕하세요, {(userProfile?.name || user?.displayName || '사용자').split(' ')[0]}님! 👋</h2>
             <p className="text-navy-700">오늘 할 일이 {todos.filter(t => !t.completed).length}개 남았습니다. 활기찬 하루 되세요!</p>
           </div>
           

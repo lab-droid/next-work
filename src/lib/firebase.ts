@@ -14,10 +14,19 @@ googleProvider.setCustomParameters({
 
 export const saveUser = async (user: User, companyCode?: string) => {
   try {
+    const isHQAdmin = user.email === 'info@nextin.ai.kr';
     const userDocRef = doc(db, 'users', user.uid);
     const userSnap = await getDoc(userDocRef);
 
     if (!userSnap.exists()) {
+      // If the user does not exist in Firestore, and this is NOT the HQ Admin, and they haven't provided a companyCode, 
+      // skip auto-creation of the user record. This allows custom workflows (like Google Login) to authenticate first,
+      // validate company code/password, and then manually save the user properly.
+      if (!isHQAdmin && !companyCode) {
+        console.log("No existing user document and no company code supplied. Profile registration cancelled.");
+        return;
+      }
+
       // Check if this is the very first user
       const usersSnap = await getDocs(query(collection(db, 'users'), limit(1)));
       const isFirstUser = usersSnap.empty;

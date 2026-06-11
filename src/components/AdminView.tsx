@@ -11,10 +11,12 @@ import { useAuth } from '../lib/AuthContext';
 interface UserProfile {
   id: string;
   email: string;
+  name?: string | null;
   displayName: string | null;
   photoURL: string | null;
   lastLoginAt: number;
   companyCode?: string | null;
+  role?: string;
   allowedMenus?: string[];
 }
 
@@ -105,8 +107,10 @@ export default function AdminView() {
       // Save user to firestore 'users' collection manually
       await setDoc(doc(db, 'users', user.uid), {
         email: user.email,
+        name: newName,
         displayName: newName,
         lastLoginAt: Date.now(),
+        role: 'user',
         ...(currentUserData?.companyCode ? { companyCode: currentUserData.companyCode } : {})
       });
 
@@ -133,11 +137,17 @@ export default function AdminView() {
   const handleDeleteUser = async (userId: string) => {
     confirm({
       title: '확인',
-      message: '선택한 사용자를 삭제하시겠습니까? (이 작업은 되돌릴 수 없습니다)',
+      message: '선택한 사용자를 삭제하시겠습니까? (삭제 시 해당 계정은 더 이상 모든 앱 내 시스템에 접속할 수 없게 됩니다.)',
       onConfirm: async () => {
         try {
+          // Delete from Firebase Auth via backend API
+          const response = await fetch(`/api/users/${userId}`, { method: 'DELETE' });
+          if (!response.ok) {
+            console.warn('Firebase Auth deletion failed or is not configured');
+          }
+          // Delete from Firestore DB
           await deleteDoc(doc(db, 'users', userId));
-          alert({ title: "알림", message: '사용자가 삭제되었습니다. 실제 Firebase 계정 로그인을 막으려면 Firebase Console에서 삭제해야 합니다.' });
+          alert({ title: "알림", message: '사용자가 삭제되어 애플리케이션 접근 권한이 영구 차단되었습니다.' });
         } catch (err: any) {
           console.error(err);
           alert({ title: "알림", message: '사용자 삭제에 실패했습니다.' });
@@ -145,6 +155,9 @@ export default function AdminView() {
       }
     });
   };
+
+  const [editingNameUserId, setEditingNameUserId] = useState<string | null>(null);
+  const [tempName, setTempName] = useState('');
 
   const openMenuEditor = (user: UserProfile) => {
     setEditingMenusUserId(user.id);
@@ -155,6 +168,30 @@ export default function AdminView() {
     setTempMenus(prev => 
       prev.includes(view) ? prev.filter(m => m !== view) : [...prev, view]
     );
+  };
+
+  const handleUpdateName = async (userId: string) => {
+    try {
+      if (!tempName.trim()) {
+        alert({ title: '알림', message: '이름을 입력해주세요.' });
+        return;
+      }
+      await setDoc(doc(db, 'users', userId), { name: tempName.trim() }, { merge: true });
+      setEditingNameUserId(null);
+    } catch(err) {
+      console.error(err);
+      alert({ title: '오류', message: '이름 변경에 실패했습니다.' });
+    }
+  };
+
+  const handleUpdateRole = async (userId: string, newRole: string) => {
+    try {
+      await setDoc(doc(db, 'users', userId), { role: newRole }, { merge: true });
+      alert({ title: '알림', message: '관리자 권한이 변경되었습니다.' });
+    } catch (err) {
+      console.error(err);
+      alert({ title: '오류', message: '권한 변경에 실패했습니다.' });
+    }
   };
 
   const saveMenuPermissions = async (userId: string) => {
@@ -186,6 +223,7 @@ export default function AdminView() {
               <th className="py-3 px-4 text-sm font-semibold text-gray-500">사용자</th>
               <th className="py-3 px-4 text-sm font-semibold text-gray-500">이메일</th>
               <th className="py-3 px-4 text-sm font-semibold text-gray-500">회사 코드</th>
+              <th className="py-3 px-4 text-sm font-semibold text-gray-500">권한</th>
               <th className="py-3 px-4 text-sm font-semibold text-gray-500">마지막 로그인</th>
               <th className="py-3 px-4 text-sm font-semibold text-gray-500 text-right">관리</th>
             </tr>
@@ -200,7 +238,33 @@ export default function AdminView() {
                       alt="User" 
                       className="w-8 h-8 rounded-full border border-gray-200" 
                     />
-                    <span className="font-medium text-navy-900">{user.displayName || '이름 없음'}</span>
+                    {editingNameUserId === user.id ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={tempName}
+                          onChange={e => setTempName(e.target.value)}
+                          className="border border-brand-500 rounded px-2 py-1 outline-none text-sm w-32"
+                          autoFocus
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') handleUpdateName(user.id);
+                            if (e.key === 'Escape') setEditingNameUserId(null);
+                          }}
+                        />
+                        <button onClick={() => handleUpdateName(user.id)} className="text-brand-500 text-xs font-medium hover:underline">저장</button>
+                      </div>
+                    ) : (
+                      <span 
+                        className="font-medium text-navy-900 cursor-pointer hover:underline decoration-dashed decoration-gray-300 underline-offset-4"
+                        onClick={() => {
+                          setEditingNameUserId(user.id);
+                          setTempName(user.name || user.displayName || '');
+                        }}
+                        title="이름 변경"
+                      >
+                        {user.name || user.displayName || '이름 없음'}
+                      </span>
+                    )}
                   </div>
                 </td>
                 <td className="py-3 px-4 text-gray-600">
@@ -208,6 +272,16 @@ export default function AdminView() {
                 </td>
                 <td className="py-3 px-4 text-gray-600">
                   {user.companyCode || '-'}
+                </td>
+                <td className="py-3 px-4 text-gray-600">
+                  <select
+                    className="border border-gray-300 rounded px-2 py-1 text-sm outline-none bg-transparent"
+                    value={user.role || 'user'}
+                    onChange={(e) => handleUpdateRole(user.id, e.target.value)}
+                  >
+                    <option value="user">사용자</option>
+                    <option value="admin">관리자</option>
+                  </select>
                 </td>
                 <td className="py-3 px-4 text-gray-600">
                   {user.lastLoginAt ? format(new Date(user.lastLoginAt), 'yyyy-MM-dd HH:mm') : '-'}

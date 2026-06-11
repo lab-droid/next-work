@@ -101,9 +101,29 @@
         "createdAt": { "type": "number" }
       },
       "required": ["userId", "name", "email", "phone", "company", "status", "createdAt"]
+    },
+    "CompanyCode": {
+      "title": "CompanyCode",
+      "description": "Company registration codes managed by HQ workspace.",
+      "type": "object",
+      "properties": {
+        "companyCode": { "type": "string" },
+        "companyName": { "type": "string" },
+        "password": { "type": "string" },
+        "firstLoggedUser": { "type": "string" },
+        "registeredUsersCount": { "type": "number" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["companyCode", "companyName", "password", "createdAt"]
     }
   },
   "firestore": {
+    "company_codes/{codeId}": {
+      "schema": {
+        "$ref": "#/entities/CompanyCode"
+      },
+      "description": "Stores company codes, passwords and assigned admin info."
+    },
     "todos/{todoId}": {
       "schema": {
         "$ref": "#/entities/Todo"

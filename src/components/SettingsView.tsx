@@ -8,13 +8,22 @@ import { useModal } from '../lib/ModalContext';
 
 export default function SettingsView() {
   const { alert } = useModal();
-  const { user, isAdmin } = useAuth();
+  const { user, userProfile, isAdmin } = useAuth();
+  const [userName, setUserName] = useState(userProfile?.name || user?.displayName || '사용자');
+  const [userPhotoURL, setUserPhotoURL] = useState<string | null>(userProfile?.photoURL || user?.photoURL || null);
+  const [department, setDepartment] = useState(userProfile?.department || '');
+  const [position, setPosition] = useState(userProfile?.position || '');
+  const [phoneNumber, setPhoneNumber] = useState(userProfile?.phoneNumber || '');
+  
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [companyName, setCompanyName] = useState('넥스트워크');
   const [companyCode, setCompanyCode] = useState('');
   const [companyLogo, setCompanyLogo] = useState<string | null>(nextworkLogo);
   const [isSaving, setIsSaving] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const userPhotoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') as 'light' | 'dark';
@@ -24,6 +33,67 @@ export default function SettingsView() {
       setTheme('dark');
     }
   }, []);
+
+  useEffect(() => {
+    if (userProfile) {
+      if (userProfile.name) setUserName(userProfile.name);
+      if (userProfile.photoURL) setUserPhotoURL(userProfile.photoURL);
+      if (userProfile.department) setDepartment(userProfile.department);
+      if (userProfile.position) setPosition(userProfile.position);
+      if (userProfile.phoneNumber) setPhoneNumber(userProfile.phoneNumber);
+    }
+  }, [userProfile]);
+
+  const handleSaveAllSettings = async () => {
+    if (!user) return;
+    
+    if (!userName.trim()) {
+      alert({ title: '알림', message: '사용자명을 입력해주세요.' });
+      return;
+    }
+    if (isAdmin && (!companyName.trim() || !companyCode.trim())) {
+      alert({ title: '알림', message: '회사명과 회사 코드를 모두 입력해주세요.' });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // Save User Profile
+      await setDoc(doc(db, 'users', user.uid), {
+        name: userName.trim(),
+        photoURL: userPhotoURL,
+        department: department.trim(),
+        position: position.trim(),
+        phoneNumber: phoneNumber.trim(),
+        updatedAt: Date.now()
+      }, { merge: true });
+    } catch (err) {
+      console.error(err);
+      handleFirestoreError(err, OperationType.UPDATE, 'users');
+      setIsSaving(false);
+      return;
+    }
+
+    // Save Company Info
+    if (isAdmin && userProfile?.companyCode) {
+      try {
+        await setDoc(doc(db, 'company_codes', userProfile.companyCode), {
+          companyName: companyName.trim(),
+          companyLogo: companyLogo,
+          updatedAt: Date.now()
+        }, { merge: true });
+      } catch (err) {
+        console.error(err);
+        handleFirestoreError(err, OperationType.UPDATE, 'company_codes');
+        setIsSaving(false);
+        return;
+      }
+    }
+
+    setIsEditingProfile(false);
+    alert({ title: '알림', message: '모든 설정이 성공적으로 저장되었습니다.' });
+    setIsSaving(false);
+  };
 
   const handleThemeChange = (newTheme: 'light' | 'dark') => {
     setTheme(newTheme);
@@ -38,11 +108,12 @@ export default function SettingsView() {
   useEffect(() => {
     const fetchCompanyData = async () => {
       try {
-        const docRef = doc(db, 'settings', 'company_info');
+        if (!userProfile?.companyCode) return;
+        const docRef = doc(db, 'company_codes', userProfile.companyCode);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           setCompanyName(docSnap.data().companyName || '넥스트워크');
-          setCompanyCode(docSnap.data().companyCode || '');
+          setCompanyCode(docSnap.id);
           setCompanyLogo(docSnap.data().companyLogo || nextworkLogo);
         }
       } catch (err) {
@@ -50,27 +121,42 @@ export default function SettingsView() {
       }
     };
     if (user) fetchCompanyData();
-  }, [user]);
+  }, [user, userProfile]);
 
-  const handleSaveCompanyInfo = async () => {
-    if (!isAdmin) return;
-    if (!companyName.trim() || !companyCode.trim()) {
-      alert({ title: '알림', message: '회사명과 회사 코드를 모두 입력해주세요.' });
-      return;
-    }
-    setIsSaving(true);
-    try {
-      await setDoc(doc(db, 'settings', 'company_info'), {
-        companyName: companyName.trim(),
-        companyCode: companyCode.trim(),
-        companyLogo: companyLogo,
-        updatedAt: Date.now()
-      });
-      alert({ title: '알림', message: '회사 정보가 갱신되었습니다.' });
-    } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, 'settings/company_info');
-    } finally {
-      setIsSaving(false);
+  const handleUserPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!['image/jpeg', 'image/png'].includes(file.type)) {
+        alert({ title: '알림', message: 'JPG 또는 PNG 형식의 이미지만 업로드 가능합니다.' });
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const maxDim = 256;
+          let width = img.width;
+          let height = img.height;
+          
+          if (width > maxDim || height > maxDim) {
+             if (width > height) {
+                 height = Math.round((height * maxDim) / width);
+                 width = maxDim;
+             } else {
+                 width = Math.round((width * maxDim) / height);
+                 height = maxDim;
+             }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          setUserPhotoURL(canvas.toDataURL(file.type));
+        }
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -124,20 +210,89 @@ export default function SettingsView() {
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-gray-100 flex items-center gap-4">
-          <div className="w-16 h-16 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-xl font-bold">
-            {user?.email?.charAt(0).toUpperCase()}
-          </div>
-          <div>
-            <h3 className="text-lg font-bold text-navy-900">{user?.displayName || '사용자'}</h3>
-            <p className="text-gray-500 text-sm">{user?.email}</p>
-          </div>
-          <button className="ml-auto px-4 py-2 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition">
-            프로필 수정
-          </button>
-        </div>
-
         <div className="divide-y divide-gray-100">
+          <div className="p-6 flex flex-col md:flex-row gap-6 hover:bg-gray-50/50 transition-colors">
+            <div className="md:w-1/3 flex gap-3">
+              <User className="w-5 h-5 text-gray-400 font-bold" />
+              <div>
+                <h4 className="font-bold text-navy-900">개인 정보</h4>
+                <p className="text-sm text-gray-500 mt-1">프로필 사진 및 기본 정보</p>
+              </div>
+            </div>
+            <div className="md:w-2/3 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">프로필 사진</label>
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-xl font-bold overflow-hidden shrink-0">
+                    {userPhotoURL ? (
+                      <img src={userPhotoURL} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      (userProfile?.name?.charAt(0) || user?.email?.charAt(0))?.toUpperCase()
+                    )}
+                  </div>
+                  <div>
+                    <input 
+                      type="file" 
+                      accept="image/png, image/jpeg" 
+                      ref={userPhotoInputRef} 
+                      onChange={handleUserPhotoChange}
+                      className="hidden" 
+                    />
+                    <button onClick={() => userPhotoInputRef.current?.click()} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition">
+                      이미지 변경
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">이름</label>
+                  <input 
+                    type="text" 
+                    value={userName}
+                    onChange={e => setUserName(e.target.value)}
+                    className="w-full border-gray-200 rounded-xl px-4 py-2 outline-none border focus:ring-brand-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">이메일</label>
+                  <input 
+                    type="email" 
+                    value={user?.email || ''}
+                    disabled
+                    className="w-full border-gray-200 bg-gray-50 rounded-xl px-4 py-2 outline-none border text-gray-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">부서</label>
+                  <input 
+                    type="text" 
+                    value={department}
+                    onChange={e => setDepartment(e.target.value)}
+                    className="w-full border-gray-200 rounded-xl px-4 py-2 outline-none border focus:ring-brand-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">직책</label>
+                  <input 
+                    type="text" 
+                    value={position}
+                    onChange={e => setPosition(e.target.value)}
+                    className="w-full border-gray-200 rounded-xl px-4 py-2 outline-none border focus:ring-brand-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">휴대폰번호</label>
+                  <input 
+                    type="tel" 
+                    value={phoneNumber}
+                    onChange={e => setPhoneNumber(e.target.value)}
+                    className="w-full border-gray-200 rounded-xl px-4 py-2 outline-none border focus:ring-brand-500"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
           {isAdmin && (
             <div className="p-6 flex flex-col md:flex-row gap-6 hover:bg-gray-50/50 transition-colors">
               <div className="md:w-1/3 flex gap-3">
@@ -183,22 +338,14 @@ export default function SettingsView() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">회사 코드</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">회사 코드 (변경 불가)</label>
                   <div className="flex gap-2">
                     <input 
                       type="text" 
                       value={companyCode}
-                      onChange={e => setCompanyCode(e.target.value)}
-                      placeholder="로그인 시 필요한 회사 코드"
-                      className="flex-1 w-full border-gray-200 rounded-xl px-4 py-2 outline-none border focus:ring-brand-500"
+                      disabled
+                      className="flex-1 w-full border-gray-200 bg-gray-50 rounded-xl px-4 py-2 outline-none border text-gray-500"
                     />
-                    <button 
-                      onClick={handleSaveCompanyInfo}
-                      disabled={isSaving}
-                      className="px-4 py-2 bg-brand-500 text-white rounded-xl text-sm font-medium hover:bg-brand-600 transition tracking-wide"
-                    >
-                      {isSaving ? '저장 중...' : '변경사항 저장'}
-                    </button>
                   </div>
                 </div>
               </div>
@@ -261,6 +408,16 @@ export default function SettingsView() {
                 비밀번호 변경
               </button>
             </div>
+          </div>
+          
+          <div className="p-6 bg-gray-50 border-t border-gray-100 flex justify-end">
+            <button 
+              onClick={handleSaveAllSettings}
+              disabled={isSaving}
+              className="px-8 py-3 bg-brand-500 text-white rounded-xl font-bold text-lg hover:bg-brand-600 transition shadow-sm hover:shadow disabled:opacity-50"
+            >
+              {isSaving ? '저장 중...' : '전체 설정 저장'}
+            </button>
           </div>
         </div>
       </div>

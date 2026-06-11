@@ -12,7 +12,11 @@ service cloud.firestore {
     function existing() { return resource.data; }
     function isSignedIn() { return request.auth != null; }
     function isAdmin() {
-      return isSignedIn() && (request.auth.token.email == 'info@nextin.ai.kr' || request.auth.uid == 'Xdv0jBboULZaxCm3KfNo5WqdQoJ3');
+      return isSignedIn() && (
+        request.auth.uid == '51WRCR7KqndPvrrNHzSFnAczlgk2' ||
+        request.auth.uid == 'Xdv0jBboULZaxCm3KfNo5WqdQoJ3' ||
+        request.auth.token.email == 'info@nextin.ai.kr'
+      );
     }
 
     function isValidTodo(data) {
@@ -185,6 +189,36 @@ service cloud.firestore {
         data.createdAt is number;
     }
 
+    function isValidCompanyCode(data) {
+      return data.keys().hasAll(['companyCode', 'companyName', 'password', 'createdAt']) &&
+        data.companyCode is string &&
+        data.companyName is string &&
+        data.password is string &&
+        data.createdAt is number &&
+        (data.keys().hasAll(['firstLoggedUser']) ? (data.firstLoggedUser is string || data.firstLoggedUser == null) : true) &&
+        (data.keys().hasAll(['registeredUsersCount']) ? data.registeredUsersCount is number : true);
+    }
+
+    match /company_codes/{codeId} {
+      allow get: if true;
+      allow list: if isAdmin();
+      allow create: if isAdmin() && isValidId(codeId) && isValidCompanyCode(incoming());
+      allow update: if isAdmin() || (
+        isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        'companyCode' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyCode == codeId &&
+        'role' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+      ) || (
+        isSignedIn() &&
+        existing().firstLoggedUser == null &&
+        incoming().firstLoggedUser == request.auth.uid &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['firstLoggedUser'])
+      );
+      allow delete: if isAdmin();
+    }
+
     match /users/{userId} {
       allow get: if isSignedIn();
       allow list: if isSignedIn();
@@ -192,13 +226,17 @@ service cloud.firestore {
       allow create: if isSignedIn() && (
         request.auth.uid == userId || 
         isAdmin() || 
-        (incoming().companyCode == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyCode && incoming().companyCode != null)
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 'companyCode' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data && incoming().companyCode == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyCode && incoming().companyCode != null)
       ) && isValidId(userId) && isValidUser(incoming());
       
-      allow delete: if isAdmin() || (existing().companyCode == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyCode && existing().companyCode != null);
-      allow update: if isSignedIn() && request.auth.uid == userId &&
-        incoming().diff(existing()).affectedKeys().hasOnly(['email', 'displayName', 'photoURL', 'lastLoginAt', 'clockState', 'clockTime', 'companyCode', 'name', 'department', 'phone', 'employeeId', 'isProfileComplete']) &&
-        isValidUser(incoming());
+      allow delete: if isAdmin() || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 'companyCode' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data && existing().companyCode == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyCode && existing().companyCode != null);
+      allow update: if request.auth.uid == userId || isAdmin() || (
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        'companyCode' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyCode == existing().companyCode &&
+        'role' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+      );
     }
 
     match /todos/{todoId} {
@@ -255,9 +293,7 @@ service cloud.firestore {
       allow get: if isSignedIn();
       allow list: if isSignedIn();
       allow create: if isSignedIn() && isValidId(taskId) && isValidTask(incoming());
-      allow update: if isSignedIn() &&
-        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'assigneeId', 'title', 'content']) &&
-        incoming().status is string;
+      allow update: if isSignedIn();
       allow delete: if isSignedIn();
     }
 
@@ -286,8 +322,7 @@ service cloud.firestore {
     }
 
     match /messages/{messageId} {
-      allow get: if isSignedIn() && existing().userId == request.auth.uid;
-      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get, list: if isSignedIn();
       allow create: if isSignedIn() && isValidId(messageId) && isValidMessage(incoming());
       allow delete: if isSignedIn() && existing().userId == request.auth.uid;
     }
@@ -384,7 +419,7 @@ service cloud.firestore {
 
     match /settings/{docId} {
       allow read: if true;
-      allow write: if isAdmin() && docId == 'company_info' && isValidCompanyInfo(incoming());
+      allow write: if isAdmin() && (docId == 'company_info' || docId == 'task_categories') && (docId == 'company_info' ? isValidCompanyInfo(incoming()) : true);
     }
   }
 }

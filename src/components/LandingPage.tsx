@@ -4,7 +4,7 @@ import nextworkLogo from '../assets/images/nextwork_logo_1781108444824.png';
 import { ArrowRight, MessageSquare, LayoutDashboard, CalendarDays, Users, CheckCircle2, Play, ChevronRight, LogIn, Building, KeyRound, Mail, Lock, X, Send, Plus, Search, Sparkles, Smile, Check, Briefcase, TrendingUp, HelpCircle, Clock, ArrowUpRight } from 'lucide-react';
 import { ViewState } from '../App';
 import { useAuth } from '../lib/AuthContext';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 
@@ -26,14 +26,27 @@ const pricing = [
 ];
 
 export default function LandingPage({ onNavigate }: LandingPageProps) {
-  const { signIn } = useAuth();
+  const { user, userProfile, signIn, signOut, isAdmin } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [step, setStep] = useState<'general-auth'>('general-auth');
   const [isSignup, setIsSignup] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [companyCode, setCompanyCode] = useState('');
+  const [companyPassword, setCompanyPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
+  const [googleAuthUser, setGoogleAuthUser] = useState<any>(null);
+
+  React.useEffect(() => {
+    // If the user refreshed the page while mid-signup, their session exists but profile doesn't.
+    // Trigger the Google modal automatically.
+    if (user && !userProfile && user.email !== 'info@nextin.ai.kr' && !isGoogleModalOpen) {
+      setGoogleAuthUser(user);
+      setIsGoogleModalOpen(true);
+    }
+  }, [user, userProfile, isGoogleModalOpen]);
 
   // Pre-login interactive dashboard preview state
   const [activeDemo, setActiveDemo] = useState<'messenger' | 'kanban' | 'calendar' | 'crm'>('kanban');
@@ -92,6 +105,81 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
     setKanbanTasks(prev => prev.map(t => t.id === id ? { ...t, status: nextStatus } : t));
   };
 
+  const handleGoogleCompanySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!googleAuthUser) return;
+    
+    setIsLoading(true);
+    setErrorMsg('');
+    
+    try {
+      const authUser = googleAuthUser;
+      const trimmedEmail = authUser.email?.trim().toLowerCase();
+      
+      const cleanedCode = companyCode.trim().toUpperCase();
+      const enteredPassword = companyPassword.trim();
+
+      if (!cleanedCode || !enteredPassword) {
+        setErrorMsg('회사 코드와 비밀번호를 입력하셔야 합니다.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Check company code matching
+      const codeRef = doc(db, 'company_codes', cleanedCode);
+      const codeSnap = await getDoc(codeRef);
+      
+      if (!codeSnap.exists()) {
+        setErrorMsg('존재하지 않는 회사 코드입니다.');
+        setIsLoading(false);
+        return;
+      }
+
+      const codeData = codeSnap.data();
+      if (codeData.password !== enteredPassword) {
+        setErrorMsg('회사 가입 비밀번호가 일치하지 않습니다.');
+        setIsLoading(false);
+        return;
+      }
+
+      let userRole = 'user';
+      let firstLogged = codeData.firstLoggedUser;
+
+      if (!firstLogged) {
+        userRole = 'admin';
+        await setDoc(codeRef, { firstLoggedUser: authUser.uid }, { merge: true });
+      }
+
+      const userData: any = {
+        email: authUser.email,
+        lastLoginAt: Date.now(),
+        companyCode: cleanedCode,
+        isProfileComplete: true,
+        role: userRole,
+        name: authUser.displayName || trimmedEmail?.split('@')[0] || '회사원',
+        createdAt: Date.now()
+      };
+
+      if (authUser.photoURL) {
+        userData.photoURL = authUser.photoURL;
+      }
+
+      // Setting this doc will trigger onSnapshot in AuthContext!
+      const userDocRef = doc(db, 'users', authUser.uid);
+      await setDoc(userDocRef, userData, { merge: true });
+      
+      setIsLoading(false);
+      setIsGoogleModalOpen(false);
+      setIsModalOpen(false);
+      
+      // Because we set the doc, AuthContext will load the profile and App will navigate to 'settings'
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(err.message || '오류가 발생했습니다.');
+      setIsLoading(false);
+    }
+  };
+
   const handleGeneralAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) return;
@@ -99,12 +187,93 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
     setErrorMsg('');
     try {
       const auth = getAuth();
-      if (isSignup) {
-        await createUserWithEmailAndPassword(auth, email, password);
-      } else {
-        await signInWithEmailAndPassword(auth, email, password);
+      const trimmedEmail = email.trim().toLowerCase();
+      const isHQAdmin = trimmedEmail === 'info@nextin.ai.kr';
+
+      let codeData: any = null;
+      let cleanedCode = '';
+
+      if (!isHQAdmin) {
+        if (!companyCode.trim() || !companyPassword.trim()) {
+          setErrorMsg('회사 가입 코드와 비밀번호를 모두 입력해 주세요.');
+          setIsLoading(false);
+          return;
+        }
+        cleanedCode = companyCode.trim().toUpperCase();
+        const codeRef = doc(db, 'company_codes', cleanedCode);
+        const codeSnap = await getDoc(codeRef);
+        if (!codeSnap.exists()) {
+          setErrorMsg('존재하지 않는 회사 코드입니다.');
+          setIsLoading(false);
+          return;
+        }
+        codeData = codeSnap.data();
+        if (codeData.password !== companyPassword.trim()) {
+          setErrorMsg('회사 비밀번호가 일치하지 않습니다.');
+          setIsLoading(false);
+          return;
+        }
       }
-      // AuthContext will automatically redirect the user
+
+      // Perform sign in or sign up
+      let userCredential;
+      if (isSignup) {
+        userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      } else {
+        userCredential = await signInWithEmailAndPassword(auth, email, password);
+      }
+
+      const authUser = userCredential.user;
+
+      if (!isHQAdmin && codeData) {
+        const userDocRef = doc(db, 'users', authUser.uid);
+        const userSnap = await getDoc(userDocRef);
+        
+        let userRole = 'user';
+        let firstLogged = codeData.firstLoggedUser;
+
+        // If this company has no assigned admin, assign this first logged user as corporate admin!
+        if (!firstLogged) {
+          userRole = 'admin';
+          firstLogged = authUser.uid;
+          
+          const codeRef = doc(db, 'company_codes', cleanedCode);
+          await setDoc(codeRef, { firstLoggedUser: authUser.uid }, { merge: true });
+        }
+
+        const userData: any = {
+          email: authUser.email,
+          lastLoginAt: Date.now(),
+          companyCode: cleanedCode,
+          isProfileComplete: true,
+          role: userRole,
+          name: authUser.displayName || email.split('@')[0]
+        };
+
+        if (!userSnap.exists()) {
+          userData.createdAt = Date.now();
+        }
+
+        await setDoc(userDocRef, userData, { merge: true });
+      } else if (isHQAdmin) {
+        const userDocRef = doc(db, 'users', authUser.uid);
+        const userSnap = await getDoc(userDocRef);
+        
+        const userData: any = {
+          email: authUser.email,
+          lastLoginAt: Date.now(),
+          isProfileComplete: true,
+          role: 'admin',
+          name: '본사 관리자'
+        };
+
+        if (!userSnap.exists()) {
+          userData.createdAt = Date.now();
+        }
+
+        await setDoc(userDocRef, userData, { merge: true });
+      }
+
     } catch (err: any) {
       if (err.code === 'auth/operation-not-allowed') {
         setErrorMsg('Firebase 프로젝트 환경설정에서 이메일/비밀번호 로그인을 활성화해주세요.');
@@ -136,19 +305,44 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
             <a href="#stories" className="hover:text-brand-500 transition-colors">성공 사례</a>
           </nav>
           <div className="flex items-center gap-4">
-            <button 
-              onClick={() => { setIsModalOpen(true); setStep('general-auth'); setIsSignup(false); setErrorMsg(''); setEmail(''); setPassword(''); }} 
-              className="text-sm font-medium text-navy-700 hover:text-navy-900 flex items-center gap-1.5 transition-colors"
-            >
-              <LogIn className="w-4 h-4" />
-              로그인 / 회원가입
-            </button>
-            <button 
-              onClick={() => { setIsModalOpen(true); setStep('general-auth'); setIsSignup(true); setErrorMsg(''); setEmail(''); setPassword(''); }}
-              className="bg-brand-500 hover:bg-brand-600 text-white px-5 py-2.5 rounded-xl font-semibold transition-all hover:scale-105 active:scale-95 shadow-soft hidden md:block"
-            >
-              무료로 시작하기
-            </button>
+            {user ? (
+              <>
+                <button 
+                  onClick={() => {
+                    const isHQAdmin = user?.email === 'info@nextin.ai.kr';
+                    if (isHQAdmin) onNavigate('hq-dashboard');
+                    else if (isAdmin) onNavigate('admin');
+                    else onNavigate('settings');
+                  }}
+                  className="text-sm font-semibold text-brand-600 hover:text-brand-700 flex items-center gap-1.5 transition-all bg-brand-50 hover:bg-brand-100 px-4 py-2.5 rounded-xl border border-brand-100 shadow-sm"
+                >
+                  <LayoutDashboard className="w-4 h-4" />
+                  {user?.email === 'info@nextin.ai.kr' ? '본사 콘솔 이동' : (isAdmin ? '관리자페이지 이동' : '마이페이지 이동')}
+                </button>
+                <button 
+                  onClick={signOut}
+                  className="text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors ml-2 bg-gray-50 hover:bg-gray-100 px-3.5 py-2.5 rounded-xl border border-gray-200"
+                >
+                  로그아웃
+                </button>
+              </>
+            ) : (
+              <>
+                <button 
+                  onClick={() => { setIsModalOpen(true); setStep('general-auth'); setIsSignup(false); setErrorMsg(''); setEmail(''); setPassword(''); }} 
+                  className="text-sm font-medium text-navy-700 hover:text-navy-900 flex items-center gap-1.5 transition-colors"
+                >
+                  <LogIn className="w-4 h-4" />
+                  로그인 / 회원가입
+                </button>
+                <button 
+                  onClick={() => { setIsModalOpen(true); setStep('general-auth'); setIsSignup(true); setErrorMsg(''); setEmail(''); setPassword(''); }}
+                  className="bg-brand-500 hover:bg-brand-600 text-white px-5 py-2.5 rounded-xl font-semibold transition-all hover:scale-105 active:scale-95 shadow-soft hidden md:block"
+                >
+                  무료로 시작하기
+                </button>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -173,13 +367,28 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
               파편화된 툴들을 하나로 모았습니다. 메신저부터 프로젝트 관리, CRM까지. 지금 바로 당신의 비즈니스를 다음 단계로 이끄세요.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <button 
-                onClick={() => { setIsModalOpen(true); setStep('general-auth'); setIsSignup(false); setErrorMsg(''); setEmail(''); setPassword(''); }}
-                className="w-full sm:w-auto bg-brand-500 hover:bg-brand-600 text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all hover:scale-105 shadow-soft flex items-center justify-center gap-2 group"
-              >
-                대시보드 체험하기
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </button>
+              {user ? (
+                <button 
+                  onClick={() => {
+                    const isHQAdmin = user?.email === 'info@nextin.ai.kr';
+                    if (isHQAdmin) onNavigate('hq-dashboard');
+                    else if (isAdmin) onNavigate('admin');
+                    else onNavigate('settings');
+                  }}
+                  className="w-full sm:w-auto bg-brand-500 hover:bg-brand-600 text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all hover:scale-105 shadow-soft flex items-center justify-center gap-2 group border border-brand-500"
+                >
+                  {user?.email === 'info@nextin.ai.kr' ? '본사 콘솔 이동하기' : (isAdmin ? '관리자페이지 이동하기' : '마이페이지 이동하기')}
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </button>
+              ) : (
+                <button 
+                  onClick={() => { setIsModalOpen(true); setStep('general-auth'); setIsSignup(false); setErrorMsg(''); setEmail(''); setPassword(''); }}
+                  className="w-full sm:w-auto bg-brand-500 hover:bg-brand-600 text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all hover:scale-105 shadow-soft flex items-center justify-center gap-2 group border border-brand-500"
+                >
+                  대시보드 체험하기
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </button>
+              )}
               <button className="w-full sm:w-auto bg-white text-navy-900 border border-gray-200 px-8 py-4 rounded-2xl font-bold text-lg hover:bg-gray-50 transition-all flex items-center justify-center gap-2">
                 <Play className="w-5 h-5" />
                 데모 영상
@@ -868,7 +1077,7 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl relative"
+            className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative"
           >
             <button 
               onClick={() => setIsModalOpen(false)}
@@ -878,13 +1087,13 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
             </button>
             <div className="p-8">
               <div className="w-12 h-12 bg-brand-50 rounded-2xl flex items-center justify-center mb-6">
-                {step === 'code' ? <Building className="w-6 h-6 text-brand-600" /> : <Lock className="w-6 h-6 text-brand-600" />}
+                <Lock className="w-6 h-6 text-brand-600" />
               </div>
               <h3 className="text-2xl font-bold text-navy-900 mb-2">
-                {step === 'code' ? '회사 코드 입력' : step === 'login' ? '임직원 로그인' : isSignup ? '회원가입' : '로그인'}
+                {isSignup ? '회사원 가입하기' : '회사원 로그인'}
               </h3>
-              <p className="text-gray-500 mb-8 max-w-[260px]">
-                {step === 'code' ? '사내 관리자에게 전달받은 회사 코드를 입력해주세요.' : step === 'login' ? '발급받은 이메일과 비밀번호로 로그인하세요.' : isSignup ? '간편하게 가입하고 모든 기능을 사용해보세요.' : '다시 오신 것을 환영합니다!'}
+              <p className="text-gray-500 mb-8 max-w-[320px] text-sm">
+                회사 코드와 가입 비밀번호를 입력하면 바로 해당 회사 대시보드로 이동합니다. (본사 관리자는 이메일만 입력)
               </p>
 
               {errorMsg && (
@@ -901,7 +1110,7 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
               <div className="space-y-4">
                   <form onSubmit={handleGeneralAuth} className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">이메일</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">이메일 주소</label>
                       <div className="relative">
                         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                           <Mail className="w-5 h-5 text-gray-400" />
@@ -911,7 +1120,7 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
                           required
                           value={email}
                           onChange={e => setEmail(e.target.value)}
-                          className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all font-medium"
+                          className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all font-medium text-navy-900"
                           placeholder="user@example.com"
                         />
                       </div>
@@ -927,17 +1136,50 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
                           required
                           value={password}
                           onChange={e => setPassword(e.target.value)}
-                          className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all font-medium"
-                          placeholder="비밀번호"
+                          className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all font-medium text-navy-900"
+                          placeholder="비밀번호 입력 (6자리 이상)"
                         />
                       </div>
                     </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">회사 코드</label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                          <Building className="w-5 h-5 text-gray-400" />
+                        </div>
+                        <input 
+                          type="text"
+                          value={companyCode}
+                          onChange={e => setCompanyCode(e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase())}
+                          className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all font-bold uppercase text-brand-600"
+                          placeholder="예: NEXTIN (본사 관리자면 제외)"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">회사 가입 비밀번호</label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                          <KeyRound className="w-5 h-5 text-gray-400" />
+                        </div>
+                        <input 
+                          type="password"
+                          value={companyPassword}
+                          onChange={e => setCompanyPassword(e.target.value)}
+                          className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all font-medium text-navy-900"
+                          placeholder="회사 가입용 비밀번호"
+                        />
+                      </div>
+                    </div>
+
                     <button 
                       type="submit"
                       disabled={isLoading}
                       className="w-full py-3.5 bg-brand-500 text-white rounded-xl font-bold hover:bg-brand-600 transition-colors disabled:opacity-50 mt-6"
                     >
-                      {isLoading ? '처리 중...' : (isSignup ? '가입하기' : '로그인')}
+                      {isLoading ? '처리 중...' : (isSignup ? '회사 계정으로 가입' : '회사 계정으로 로그인')}
                     </button>
                   </form>
                   <div className="relative py-2 text-center">
@@ -949,9 +1191,63 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
                   <button 
                     onClick={async (e) => {
                       e.preventDefault();
+                      setIsLoading(true);
+                      setErrorMsg('');
                       try {
-                        await signIn();
+                        const { getAuth, GoogleAuthProvider, signInWithPopup, signOut } = await import('firebase/auth');
+                        const authInstance = getAuth();
+                        const provider = new GoogleAuthProvider();
+                        provider.setCustomParameters({ prompt: 'select_account' });
+                        
+                        const result = await signInWithPopup(authInstance, provider);
+                        const authUser = result.user;
+                        
+                        if (!authUser) {
+                          throw new Error('Google 로그인에 실패했습니다.');
+                        }
+
+                        const trimmedEmail = authUser.email?.trim().toLowerCase();
+                        const isHQAdmin = trimmedEmail === 'info@nextin.ai.kr';
+
+                        if (isHQAdmin) {
+                          const userDocRef = doc(db, 'users', authUser.uid);
+                          const userSnap = await getDoc(userDocRef);
+                          const userData: any = {
+                            email: authUser.email,
+                            lastLoginAt: Date.now(),
+                            isProfileComplete: true,
+                            role: 'admin',
+                            name: '본사 관리자'
+                          };
+                          if (!userSnap.exists()) {
+                            userData.createdAt = Date.now();
+                          }
+                          await setDoc(userDocRef, userData, { merge: true });
+                          setIsLoading(false);
+                          setIsModalOpen(false);
+                          return;
+                        }
+
+                        const userDocRef = doc(db, 'users', authUser.uid);
+                        const userSnap = await getDoc(userDocRef);
+                        const existingUserData = userSnap.data();
+
+                        // If returning user with registered companyCode, log in directly
+                        if (existingUserData && existingUserData.companyCode) {
+                          await setDoc(userDocRef, {
+                            lastLoginAt: Date.now()
+                          }, { merge: true });
+                          setIsLoading(false);
+                          setIsModalOpen(false);
+                          return;
+                        }
+
+                        // First-time Google user: Open popup to ask for code & password
+                        setGoogleAuthUser(authUser);
+                        setIsGoogleModalOpen(true);
+                        setIsLoading(false);
                       } catch (err: any) {
+                        setIsLoading(false);
                         if (err.code === 'auth/cancelled-popup-request' || err.code === 'auth/popup-closed-by-user') {
                           setErrorMsg('Google 로그인이 취소되었습니다. 팝업이 차단된 경우 우측 상단의 [새 탭에서 열기] 버튼을 이용해주세요.');
                         } else if (err.code === 'auth/operation-not-allowed') {
@@ -992,6 +1288,88 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
                   </p>
                 </div>
               </div>
+          </motion.div>
+        </div>
+      )}
+      
+      {/* Google Setup Modal */}
+      {isGoogleModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative p-8"
+          >
+            <button 
+              onClick={async () => {
+                const { getAuth, signOut } = await import('firebase/auth');
+                await signOut(getAuth());
+                setIsGoogleModalOpen(false);
+                setGoogleAuthUser(null);
+              }}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-full p-2 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            <div className="w-12 h-12 bg-brand-50 rounded-2xl flex items-center justify-center mb-6">
+              <Building className="w-6 h-6 text-brand-600" />
+            </div>
+            
+            <h3 className="text-2xl font-bold text-navy-900 mb-2">회사 정보 입력</h3>
+            <p className="text-gray-500 text-sm mb-6">
+              최초 로그인 시, 소속된 회사 정보를 연결해야 합니다.<br/>본사에서 발급받은 회사 코드와 가입 비밀번호를 입력해 주세요.
+            </p>
+
+            {errorMsg && isGoogleModalOpen && (
+              <div className="mb-6 p-4 bg-red-50 text-red-600 rounded-xl text-sm font-medium border border-red-100 flex flex-col gap-2">
+                <span>{errorMsg}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleGoogleCompanySubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">회사 코드</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Building className="w-5 h-5 text-gray-400" />
+                  </div>
+                  <input 
+                    type="text"
+                    required
+                    value={companyCode}
+                    onChange={e => setCompanyCode(e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase())}
+                    className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all font-bold uppercase text-brand-600"
+                    placeholder="NEXTIN"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">회사 가입 비밀번호</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <KeyRound className="w-5 h-5 text-gray-400" />
+                  </div>
+                  <input 
+                    type="password"
+                    required
+                    value={companyPassword}
+                    onChange={e => setCompanyPassword(e.target.value)}
+                    className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all font-medium text-navy-900"
+                    placeholder="비밀번호 입력"
+                  />
+                </div>
+              </div>
+
+              <button 
+                type="submit"
+                disabled={isLoading}
+                className="w-full py-3.5 bg-brand-500 text-white rounded-xl font-bold hover:bg-brand-600 transition-colors disabled:opacity-50 mt-6"
+              >
+                {isLoading ? '연결 중...' : '확인 및 접속하기'}
+              </button>
+            </form>
           </motion.div>
         </div>
       )}

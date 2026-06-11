@@ -148,7 +148,7 @@ export default function BlogSpreadsheet({ customerId }: { customerId: string }) 
                   >
                     <option value="">선택 안됨</option>
                     {users.map(u => (
-                      <option key={u.id} value={u.id}>{u.displayName || u.email}</option>
+                      <option key={u.id} value={u.id}>{u.name || u.displayName || u.email}</option>
                     ))}
                   </select>
                 </td>
