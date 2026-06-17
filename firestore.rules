@@ -347,15 +347,20 @@ service cloud.firestore {
     }
 
     match /attendances/{attendanceId} {
-      allow get: if isSignedIn() && existing().userId == request.auth.uid;
-      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && isValidId(attendanceId) && isValidAttendance(incoming());
-      allow update: if isSignedIn() && existing().userId == request.auth.uid &&
-        incoming().userId == existing().userId &&
-        incoming().diff(existing()).affectedKeys().hasOnly(['checkOut', 'status']) &&
-        incoming().checkOut is string && incoming().checkOut.size() <= 50 &&
-        incoming().status is string && incoming().status.size() <= 50;
-      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+      allow get: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    match /leaves/{leaveId} {
+      allow get: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    match /work_policies/{policyId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
     }
 
     match /approvals/{approvalId} {

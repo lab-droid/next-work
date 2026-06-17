@@ -70,6 +70,9 @@
         },
         "isProfileComplete": {
           "type": "boolean"
+        },
+        "role": {
+          "type": "string"
         }
       },
       "required": ["email", "lastLoginAt"]
@@ -115,6 +118,62 @@
         "createdAt": { "type": "number" }
       },
       "required": ["companyCode", "companyName", "password", "createdAt"]
+    },
+    "AttendanceRecord": {
+      "title": "AttendanceRecord",
+      "description": "Stores user daily check in/out details and metadata.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "date": { "type": "string" },
+        "checkIn": { "type": "string" },
+        "checkOut": { "type": "string" },
+        "authType": { "type": "string" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "ipAddress": { "type": "string" },
+        "status": { "type": "string" },
+        "companyCode": { "type": "string" },
+        "workHours": { "type": "number" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["userId", "date", "checkIn", "status", "createdAt"]
+    },
+    "Leave": {
+      "title": "Leave",
+      "description": "Annual leaves and overtime applications and approvals.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "type": { "type": "string" },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "reason": { "type": "string" },
+        "status": { "type": "string" },
+        "companyCode": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["userId", "type", "startDate", "endDate", "status", "createdAt"]
+    },
+    "WorkPolicy": {
+      "title": "WorkPolicy",
+      "description": "Company wide custom work time policies and auth conditions.",
+      "type": "object",
+      "properties": {
+        "companyCode": { "type": "string" },
+        "standardIn": { "type": "string" },
+        "standardOut": { "type": "string" },
+        "weeklyHours": { "type": "number" },
+        "officeLatitude": { "type": "number" },
+        "officeLongitude": { "type": "number" },
+        "allowedIp": { "type": "string" },
+        "policyType": { "type": "string" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["companyCode", "standardIn", "standardOut", "weeklyHours"]
     }
   },
   "firestore": {
@@ -147,6 +206,24 @@
         "$ref": "#/entities/Customer"
       },
       "description": "Stores CRM customers"
+    },
+    "attendances/{attendanceId}": {
+      "schema": {
+        "$ref": "#/entities/AttendanceRecord"
+      },
+      "description": "Stores user daily check in/out details and metadata."
+    },
+    "leaves/{leaveId}": {
+      "schema": {
+        "$ref": "#/entities/Leave"
+      },
+      "description": "Stores annual leaves/overtime applications."
+    },
+    "work_policies/{policyId}": {
+      "schema": {
+        "$ref": "#/entities/WorkPolicy"
+      },
+      "description": "Stores custom corporate work policies."
     }
   }
 }

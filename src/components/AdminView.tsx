@@ -22,7 +22,8 @@ interface UserProfile {
 
 export const MASTER_MENUS = [
   { view: 'dashboard', label: '대시보드' },
-  { view: 'projects', label: '프로젝트 홈' },
+  { view: 'projects', label: '프로젝트' },
+  { view: 'all-tasks', label: '전체 업무' },
   { view: 'my-tasks', label: '내 업무' },
   { view: 'notice', label: '공지사항' },
   { view: 'messages', label: '메시지' },

@@ -3,7 +3,7 @@ import LandingPage from './components/LandingPage';
 import DashboardLayout from './components/DashboardLayout';
 import { useAuth } from './lib/AuthContext';
 
-export type ViewState = 'landing' | 'projects' | 'project-categories' | 'project-detail' | 'dashboard' | 'my-tasks' | 'project-blog' | 'project-tasks' | 'project-schedule' | 'project-todo' | 'kanban' | 'calendar' | 'crm' | 'finance' | 'admin' | 'messages' | 'documents' | 'analytics' | 'notice' | 'hr' | 'approval' | 'marketing' | 'settings' | 'hq-dashboard' | 'hq-plans' | 'hq-subscriptions' | 'hq-payments' | 'hq-sales' | 'hq-tenants' | 'hq-modules' | 'hq-sidebar' | 'hq-audit' | 'hq-system' | 'hq-status' | 'hq-security' | 'hq-codes';
+export type ViewState = 'landing' | 'projects' | 'project-categories' | 'project-detail' | 'dashboard' | 'my-tasks' | 'all-tasks' | 'project-blog' | 'project-tasks' | 'project-schedule' | 'project-todo' | 'kanban' | 'calendar' | 'crm' | 'finance' | 'admin' | 'messages' | 'documents' | 'analytics' | 'notice' | 'hr' | 'approval' | 'marketing' | 'settings' | 'hq-dashboard' | 'hq-plans' | 'hq-subscriptions' | 'hq-payments' | 'hq-sales' | 'hq-tenants' | 'hq-modules' | 'hq-sidebar' | 'hq-audit' | 'hq-system' | 'hq-status' | 'hq-security' | 'hq-codes';
 
 export default function App() {
   const [currentView, setCurrentView] = React.useState<ViewState>('landing');

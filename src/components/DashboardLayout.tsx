@@ -26,7 +26,8 @@ import {
   ChevronDown,
   ChevronRight,
   CheckSquare,
-  FolderOpen
+  FolderOpen,
+  ClipboardList
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import SearchModal from './SearchModal';
@@ -47,7 +48,6 @@ import SettingsView from './SettingsView';
 import HQPlaceholderView from './HQPlaceholderView';
 import HQSubscriptionsView from './HQSubscriptionsView';
 import HQCodesView from './HQCodesView';
-import MyTasksView from './MyTasksView';
 import HQCompanySwitcher from './HQCompanySwitcher';
 import CompanySettingsModal from './CompanySettingsModal';
 import { useAuth } from '../lib/AuthContext';
@@ -93,13 +93,8 @@ const getNavItems = (isHQAdmin: boolean) => {
 
   items.push(
     { view: 'dashboard', icon: LayoutDashboard, label: '대시보드' },
-    {
-      icon: FolderOpen,
-      label: '프로젝트',
-      subItems: [
-        { view: 'projects', label: '프로젝트 홈' }
-      ]
-    },
+    { view: 'projects', icon: FolderOpen, label: '프로젝트' },
+    { view: 'all-tasks', icon: ClipboardList, label: '전체 업무' },
     { view: 'my-tasks', icon: CheckSquare, label: '내 업무' },
     { view: 'notice', icon: Megaphone, label: '공지사항' },
     { view: 'messages', icon: MessageSquare, label: '메시지' },
@@ -122,8 +117,7 @@ export default function DashboardLayout({ currentView, onNavigate }: DashboardLa
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({
-    '본사 콘솔': false,
-    '프로젝트': true
+    '본사 콘솔': false
   });
   const { user, userProfile, isAdmin, isHQAdmin, signOut } = useAuth();
   const [companyName, setCompanyName] = useState('넥스트워크');
@@ -144,7 +138,7 @@ export default function DashboardLayout({ currentView, onNavigate }: DashboardLa
       if (item.subItems) {
         return item.subItems.length > 0;
       }
-      return item.view && allowed.includes(item.view);
+      return item.view && (allowed.includes(item.view) || (item.view === 'all-tasks' && allowed.includes('my-tasks')));
     });
   }
 
@@ -353,7 +347,35 @@ export default function DashboardLayout({ currentView, onNavigate }: DashboardLa
                  onBack={() => onNavigate('projects' as ViewState)} 
                />
             )}
-            {(currentView === 'my-tasks' || currentView === 'project-todo') && <MyTasksView />}
+            {currentView === 'my-tasks' && (
+              <KanbanBoard 
+                mode="my"
+                onSelectProject={(p) => {
+                  setSelectedProject(p);
+                  onNavigate('project-detail' as ViewState);
+                }}
+              />
+            )}
+            {currentView === 'all-tasks' && (
+              <KanbanBoard 
+                mode="all"
+                onSelectProject={(p) => {
+                  setSelectedProject(p);
+                  onNavigate('project-detail' as ViewState);
+                }}
+              />
+            )}
+            {currentView === 'project-todo' && (
+              <KanbanBoard 
+                projectId={selectedProject?.id}
+                mode="my"
+                embedded
+                onSelectProject={(p) => {
+                  setSelectedProject(p);
+                  onNavigate('project-detail' as ViewState);
+                }}
+              />
+            )}
             {currentView === 'messages' && <MessagesView />}
             {(currentView === 'kanban' || currentView === 'project-tasks') && <KanbanBoard />}
             {(currentView === 'calendar' || currentView === 'project-schedule') && <CalendarView />}
