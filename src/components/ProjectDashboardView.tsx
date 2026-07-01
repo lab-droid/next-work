@@ -3,6 +3,7 @@ import DocumentsView from "./DocumentsView";
 import KanbanBoard from "./KanbanBoard";
 import CalendarView from "./CalendarView";
 import AnalyticsView from "./AnalyticsView";
+import ProjectFeed from "./ProjectFeed";
 import {
   ArrowLeft,
   MessageSquare,
@@ -91,9 +92,8 @@ export default function ProjectDashboardView({
       </div>
       <div className="flex-1 overflow-y-auto bg-gray-50/30">
         {activeTab === "feed" && (
-          <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-4">
-            <MessageSquare className="w-12 h-12 text-gray-300" />
-            <p className="font-medium">프로젝트 피드 기능이 준비 중입니다.</p>
+          <div className="h-full bg-white">
+            <ProjectFeed project={project} />
           </div>
         )}
         {activeTab === "tasks" && (

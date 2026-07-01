@@ -33,6 +33,7 @@ import { cn } from "../lib/utils";
 import { useModal } from "../lib/ModalContext";
 import { useTaskCategories, CategoryData } from "../hooks/useTaskCategories";
 import { Settings as SettingsIcon } from "lucide-react";
+import TaskComments from "./TaskComments";
 
 interface Task {
   id: string;
@@ -1193,6 +1194,14 @@ export default function KanbanBoard({
                     setEditingTask({ ...editingTask, tag: e.target.value })
                   }
                   className="w-full text-sm outline-none border border-gray-200 rounded-lg px-3 py-2 text-gray-600"
+                />
+              </div>
+
+              <div className="pt-4 border-t border-gray-100">
+                <TaskComments
+                  taskId={editingTask.id}
+                  taskTitle={editingTask.title}
+                  users={users}
                 />
               </div>
             </div>

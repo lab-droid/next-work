@@ -10,8 +10,7 @@ import {
   Calendar, 
   Users, 
   Settings, 
-  Search, 
-  Bell, 
+  Search,
   LogOut,
   Menu,
   X,
@@ -31,6 +30,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import SearchModal from './SearchModal';
+import NotificationBell from './NotificationBell';
 import DashboardHome from './DashboardHome';
 import KanbanBoard from './KanbanBoard';
 import AdminView from './AdminView';
@@ -321,10 +321,7 @@ export default function DashboardLayout({ currentView, onNavigate }: DashboardLa
               <span className="hidden sm:block whitespace-nowrap">플랫폼 검색 (Cmd+K)</span>
             </button>
             
-            <button className="relative p-2 text-gray-400 hover:text-navy-900 hover:bg-gray-50 rounded-lg transition-colors">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
-            </button>
+            <NotificationBell onNavigate={onNavigate} />
           </div>
         </header>
 

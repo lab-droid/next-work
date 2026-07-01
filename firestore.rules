@@ -106,19 +106,36 @@ service cloud.firestore {
     }
 
     function isValidChat(data) {
-      return data.keys().hasAll(['userId', 'name', 'createdAt']) &&
-        data.userId == request.auth.uid &&
+      return data.keys().hasAll(['name', 'createdAt']) &&
         data.name is string && data.name.size() <= 100 &&
-        data.createdAt is number;
+        data.createdAt is number &&
+        (data.keys().hasAll(['type']) ? (data.type is string && data.type.size() <= 20) : true) &&
+        (data.keys().hasAll(['companyCode']) ? (data.companyCode is string || data.companyCode == null) : true) &&
+        (data.keys().hasAll(['members']) ? data.members is list : true) &&
+        (data.keys().hasAll(['isPrivate']) ? data.isPrivate is bool : true) &&
+        (data.keys().hasAll(['projectId']) ? (data.projectId is string || data.projectId == null) : true) &&
+        (data.keys().hasAll(['createdBy']) ? data.createdBy is string : true) &&
+        (data.keys().hasAll(['userId']) ? data.userId is string : true);
     }
 
     function isValidMessage(data) {
-      return data.keys().hasAll(['userId', 'chatId', 'text', 'sender', 'createdAt']) &&
+      return data.keys().hasAll(['userId', 'chatId', 'text', 'createdAt']) &&
         data.userId == request.auth.uid &&
         data.chatId is string &&
-        data.text is string && data.text.size() <= 1000 &&
-        data.sender is string &&
-        data.createdAt is number;
+        data.text is string && data.text.size() <= 2000 &&
+        data.createdAt is number &&
+        (data.keys().hasAll(['authorName']) ? (data.authorName is string && data.authorName.size() <= 100) : true) &&
+        (data.keys().hasAll(['sender']) ? data.sender is string : true) &&
+        (data.keys().hasAll(['parentId']) ? (data.parentId is string || data.parentId == null) : true) &&
+        (data.keys().hasAll(['mentions']) ? data.mentions is list : true) &&
+        (data.keys().hasAll(['reactions']) ? data.reactions is map : true);
+    }
+
+    function isValidChannelRead(data) {
+      return data.keys().hasAll(['chatId', 'userId', 'lastReadAt']) &&
+        data.userId == request.auth.uid &&
+        data.chatId is string && data.chatId.size() <= 128 &&
+        data.lastReadAt is number;
     }
 
     function isValidAnalytics(data) {
@@ -135,8 +152,12 @@ service cloud.firestore {
       return data.keys().hasAll(['userId', 'title', 'content', 'createdAt']) &&
         data.userId == request.auth.uid &&
         data.title is string && data.title.size() <= 200 &&
-        data.content is string && data.content.size() <= 1000 &&
-        data.createdAt is number;
+        data.content is string && data.content.size() <= 2000 &&
+        data.createdAt is number &&
+        (data.keys().hasAll(['companyCode']) ? (data.companyCode is string || data.companyCode == null) : true) &&
+        (data.keys().hasAll(['authorName']) ? (data.authorName is string && data.authorName.size() <= 100) : true) &&
+        (data.keys().hasAll(['readBy']) ? data.readBy is list : true) &&
+        (data.keys().hasAll(['reactions']) ? data.reactions is map : true);
     }
 
     function isValidAttendance(data) {
@@ -297,6 +318,45 @@ service cloud.firestore {
       allow delete: if isSignedIn();
     }
 
+    function isValidComment(data) {
+      return data.keys().hasAll(['taskId', 'userId', 'authorName', 'content', 'mentions', 'createdAt']) &&
+        data.userId == request.auth.uid &&
+        data.taskId is string && data.taskId.size() <= 128 &&
+        data.authorName is string && data.authorName.size() <= 100 &&
+        data.content is string && data.content.size() <= 2000 &&
+        data.mentions is list &&
+        data.createdAt is number;
+    }
+
+    match /comments/{commentId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(commentId) && isValidComment(incoming());
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    function isValidNotification(data) {
+      return data.keys().hasAll(['userId', 'type', 'fromUserId', 'fromName', 'taskId', 'content', 'read', 'createdAt']) &&
+        data.fromUserId == request.auth.uid &&
+        data.userId is string && data.userId.size() <= 128 &&
+        data.type is string && data.type.size() <= 50 &&
+        data.fromName is string && data.fromName.size() <= 100 &&
+        data.taskId is string && data.taskId.size() <= 128 &&
+        data.content is string && data.content.size() <= 500 &&
+        data.read is bool &&
+        data.createdAt is number;
+    }
+
+    match /notifications/{notificationId} {
+      allow get: if isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(notificationId) && isValidNotification(incoming());
+      allow update: if isSignedIn() && existing().userId == request.auth.uid &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['read']) &&
+        incoming().read is bool;
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
     match /transactions/{txnId} {
       allow get: if isSignedIn() && existing().userId == request.auth.uid;
       allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
@@ -315,15 +375,34 @@ service cloud.firestore {
     }
 
     match /chats/{chatId} {
-      allow get: if isSignedIn() && existing().userId == request.auth.uid;
-      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get, list: if isSignedIn();
       allow create: if isSignedIn() && isValidId(chatId) && isValidChat(incoming());
-      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+      // Allow renaming, membership changes, and last-activity/unread bookkeeping.
+      allow update: if isSignedIn() && isValidChat(incoming());
+      allow delete: if isSignedIn() && (
+        (('createdBy' in existing()) && existing().createdBy == request.auth.uid) ||
+        (('userId' in existing()) && existing().userId == request.auth.uid) ||
+        isAdmin()
+      );
     }
 
     match /messages/{messageId} {
       allow get, list: if isSignedIn();
       allow create: if isSignedIn() && isValidId(messageId) && isValidMessage(incoming());
+      // Only emoji reactions may be edited after posting.
+      allow update: if isSignedIn() &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['reactions']) &&
+        incoming().reactions is map;
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    match /channelReads/{readId} {
+      allow get: if isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(readId) && isValidChannelRead(incoming());
+      allow update: if isSignedIn() && existing().userId == request.auth.uid &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['lastReadAt']) &&
+        incoming().lastReadAt is number;
       allow delete: if isSignedIn() && existing().userId == request.auth.uid;
     }
 
@@ -335,14 +414,22 @@ service cloud.firestore {
     }
 
     match /notices/{noticeId} {
-      allow get: if isSignedIn() && existing().userId == request.auth.uid;
-      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      // Announcements are company-wide readable (filtered by companyCode on the client).
+      allow get, list: if isSignedIn();
       allow create: if isSignedIn() && isValidId(noticeId) && isValidNotice(incoming());
-      allow update: if isSignedIn() && existing().userId == request.auth.uid &&
-        incoming().userId == existing().userId &&
-        incoming().diff(existing()).affectedKeys().hasOnly(['title', 'content']) &&
-        incoming().title is string && incoming().title.size() <= 200 &&
-        incoming().content is string && incoming().content.size() <= 1000;
+      allow update: if isSignedIn() && (
+        // Author may edit the announcement body.
+        (existing().userId == request.auth.uid &&
+          incoming().userId == existing().userId &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['title', 'content', 'readBy', 'reactions']) &&
+          incoming().title is string && incoming().title.size() <= 200 &&
+          incoming().content is string && incoming().content.size() <= 2000)
+        ||
+        // Anyone may mark-as-read or toggle a reaction.
+        (incoming().diff(existing()).affectedKeys().hasOnly(['readBy', 'reactions']) &&
+          incoming().readBy is list &&
+          incoming().reactions is map)
+      );
       allow delete: if isSignedIn() && existing().userId == request.auth.uid;
     }
 
